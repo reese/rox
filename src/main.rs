@@ -63,6 +63,8 @@ fn repl() {
 }
 
 fn interpret(input: Vec<u8>) -> InterpretResult {
-  compile(&input);
+  let chunk = &mut Chunk::new();
+  let mut compiler = Compiler::new(&input, chunk);
+  compiler.compile();
   return InterpretResult::InterpretOk
 }

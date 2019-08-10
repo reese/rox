@@ -4,41 +4,41 @@ use super::traits::Push;
 
 #[derive(Clone, Debug)]
 pub struct Value {
-  pub f: f64
+  pub float: f64
 }
 
 impl Add for Value {
   type Output = Self;
   fn add(self, other: Self) -> Value {
-    return Value { f: self.f + other.f }
+    return Value { float: self.float + other.float }
   }
 }
 
 impl Div for Value {
   type Output = Self;
   fn div(self, other: Self) -> Value {
-    return Value { f: self.f / other.f }
+    return Value { float: self.float / other.float }
   }
 }
 
 impl Mul for Value {
   type Output = Self;
   fn mul(self, other: Self) -> Value {
-    return Value { f: self.f * other.f }
+    return Value { float: self.float * other.float }
   }
 }
 
 impl Neg for Value {
   type Output = Value;
   fn neg(self) -> Value {
-    return Value { f: -self.f }
+    return Value { float: -self.float }
   }
 }
 
 impl Sub for Value {
   type Output = Self;
   fn sub(self, other: Self) -> Value {
-    return Value { f: self.f - other.f }
+    return Value { float: self.float - other.float }
   }
 }
 

@@ -1,17 +1,18 @@
 use super::interpret_result::InterpretResult;
-use super::chunk::Chunk;
+use super::chunk::{Byte, Chunk};
 use super::common::OpCode;
+use super::compile::Compiler;
 use super::value::Value;
 
 #[derive(Debug)]
-pub struct VM {
-  pub chunk: Chunk,
-  ips: Vec<OpCode>,
+pub struct VM<'a> {
+  pub chunk: &'a mut Chunk,
+  ips: Vec<Byte>,
   stack: Vec<Value>,
 }
 
-impl VM {
-  pub fn new(chunk: Chunk) -> VM {
+impl<'vm, 'chunk> VM<'vm> {
+  pub fn new(chunk: &'chunk mut Chunk) -> VM {
     return VM { 
       chunk: chunk,
       ips: vec![],
@@ -19,9 +20,14 @@ impl VM {
     }
   }
 
-  pub fn interpret(&mut self) -> InterpretResult {
-    self.ips = self.chunk.codes.clone();
-    return self.run()
+  pub fn interpret(&mut self, source: Vec<u8>) -> InterpretResult {
+    let mut compiler = Compiler::new(&source, self.chunk);
+    if !compiler.compile() {
+      return InterpretResult::InterpretCompileError
+    }
+    self.ips = self.chunk.codes.to_vec();
+    let result = self.run();
+    return result
   }
 
   fn run(&mut self) -> InterpretResult {
@@ -29,23 +35,24 @@ impl VM {
     let mut constant_index = 0;
     while code_index < self.ips.len() {
       match self.ips[code_index] {
-        OpCode::OpReturn => {
+        Byte::Op(OpCode::OpReturn) => {
           println!("{:?}", self.stack.pop());
           return InterpretResult::InterpretOk
         },
-        OpCode::OpNegate => {
+        Byte::Op(OpCode::OpNegate) => {
           let next_constant = self.get_next_constant();
           self.stack.push(-next_constant)
         },
-        OpCode::OpAdd => self.binary_operation("+"),
-        OpCode::OpSubtract => self.binary_operation("-"),
-        OpCode::OpMultiply => self.binary_operation("*"),
-        OpCode::OpDivide => self.binary_operation("/"),
-        OpCode::OpConstant => {
+        Byte::Op(OpCode::OpAdd) => self.binary_operation("+"),
+        Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
+        Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
+        Byte::Op(OpCode::OpDivide) => self.binary_operation("/"),
+        Byte::Op(OpCode::OpConstant) => {
           let constant = &self.chunk.constants.values[constant_index];
           constant_index += 1;
           &self.stack.push(constant.clone());
         },
+        _ => unreachable!(),
       }
       code_index += 1;
     }

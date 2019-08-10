@@ -2,9 +2,15 @@ use super::common::OpCode;
 use super::value::{Value, ValueArray};
 use super::traits::*;
 
+#[derive(Clone, Debug)]
+pub enum Byte {
+  Op(OpCode),
+  Constant(u8)
+}
+
 #[derive(Debug)]
 pub struct Chunk {
-  pub codes: Vec<OpCode>,
+  pub codes: Vec<Byte>,
   pub constants: ValueArray,
   pub lines: Vec<i32>,
 }
@@ -29,18 +35,18 @@ impl Clone for Chunk {
   }
 }
 
-impl PushLine<OpCode> for Chunk {
-  fn push_line(&mut self, byte: OpCode, line: i32) -> usize {
+impl PushLine<Byte> for Chunk {
+  fn push_line(&mut self, byte: Byte, line: i32) -> u8 {
     self.codes.push(byte);
     self.lines.push(line);
-    return self.codes.len() - 1
+    return (self.codes.len() - 1) as u8
   }
 }
 
 impl PushLine<Value> for Chunk {
-  fn push_line(&mut self, byte: Value, line: i32) -> usize {
+  fn push_line(&mut self, byte: Value, line: i32) -> u8 {
     self.constants.push(byte);
     self.lines.push(line);
-    return self.constants.values.len() - 1
+    return (self.constants.values.len() - 1) as u8
   }
 }
