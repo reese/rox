@@ -26,8 +26,10 @@ impl<'scanner> Scanner<'scanner> {
     return self.peek() == String::from("\0").as_bytes()[0];
   }
 
-  pub fn scan_token(&mut self) -> Token<'scanner > {
+  pub fn scan_token(&mut self) -> Token<'scanner> {
     self.skip_whitespace();
+
+    self.start = self.current;
 
     if self.is_at_end() {
       let token = self.make_token(TokenType::TokenEof);
@@ -36,9 +38,9 @@ impl<'scanner> Scanner<'scanner> {
 
     let character = self.peek();
     if Scanner::is_alpha(character) {
-      return self.identifier()
+      return self.identifier();
     } else if Scanner::is_digit(character) {
-      return self.number()
+      return self.number();
     }
 
     let token = match character {
@@ -81,7 +83,7 @@ impl<'scanner> Scanner<'scanner> {
         } else {
           return self.make_token(TokenType::TokenLess);
         }
-      },
+      }
       _ => self.error_token(),
     };
 
@@ -89,13 +91,20 @@ impl<'scanner> Scanner<'scanner> {
     return token;
   }
 
-  fn check_keyword(&self, start: usize, length: usize, rest: &str, tokenType: TokenType) -> TokenType {
+  fn check_keyword(
+    &self,
+    start: usize,
+    length: usize,
+    rest: &str,
+    token_type: TokenType,
+  ) -> TokenType {
     if (self.current - self.start == start + length)
-      && (&self.source[(self.current + start)..(length + 1)] == rest.as_bytes()) {
-      return tokenType
+      && (&self.source[(self.current + start)..(length + 1)] == rest.as_bytes())
+    {
+      return token_type;
     }
 
-    return TokenType::TokenIdentifier
+    return TokenType::TokenIdentifier;
   }
 
   fn identifier(&mut self) -> Token<'scanner> {
@@ -103,7 +112,7 @@ impl<'scanner> Scanner<'scanner> {
       self.advance()
     }
 
-    return self.make_token(self.identifier_type())
+    return self.make_token(self.identifier_type());
   }
 
   fn number(&mut self) -> Token<'scanner> {
@@ -119,7 +128,7 @@ impl<'scanner> Scanner<'scanner> {
       }
     }
 
-    return self.make_token(TokenType::TokenNumber)
+    return self.make_token(TokenType::TokenNumber);
   }
 
   fn identifier_type(&self) -> TokenType {
@@ -144,7 +153,7 @@ impl<'scanner> Scanner<'scanner> {
             _ => {}
           }
         }
-      },
+      }
       b't' => {
         if (self.current - self.start) > 1 {
           match self.source[self.current + 1] {
@@ -157,7 +166,7 @@ impl<'scanner> Scanner<'scanner> {
       _ => {}
     }
 
-    return TokenType::TokenIdentifier
+    return TokenType::TokenIdentifier;
   }
 
   fn make_token(&self, token_type: TokenType) -> Token<'scanner> {
@@ -213,7 +222,11 @@ impl<'scanner> Scanner<'scanner> {
   }
 
   fn peek(&self) -> u8 {
-    println!("{}", self.current);
+    // This is a check for the repl, since there's no EOF
+    // on the command line
+    if self.current == self.source.len() {
+      return b'\0';
+    }
     return self.source[self.current];
   }
 
@@ -232,6 +245,6 @@ impl<'scanner> Scanner<'scanner> {
   }
 
   fn is_digit(character: u8) -> bool {
-    return character >= b'0' && character <= b'9'
+    return character >= b'0' && character <= b'9';
   }
 }

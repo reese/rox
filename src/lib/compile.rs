@@ -1,3 +1,4 @@
+use num_traits::FromPrimitive;
 use std::str;
 
 use super::chunk::{Byte, Chunk};
@@ -225,6 +226,7 @@ const RULES: [ParseRule; 42] = [
   }, // EOF
 ];
 
+#[derive(Debug)]
 pub struct Compiler<'a> {
   scanner: Scanner<'a>,
   parser: Parser<'a>,
@@ -263,7 +265,8 @@ impl<'compiler> Compiler<'compiler> {
   }
 
   pub fn consume(&mut self, token_type: TokenType, message: &str) {
-    if self.parser.current.token_type == token_type {
+    let is_same_token = matches!(self.parser.current.token_type, token_type);
+    if is_same_token {
       self.advance();
       return;
     }
@@ -275,10 +278,10 @@ impl<'compiler> Compiler<'compiler> {
     let operator_type = self.parser.previous.token_type.clone();
 
     let rule = self.get_rule(operator_type);
-    let precedence = rule.precedence.clone();
-    self.parse_precedence(precedence);
+    let precedence: Precedence = FromPrimitive::from_u8(rule.precedence.clone() as u8 + 1).unwrap();
+    self.parse_precedence(precedence.clone());
 
-    match self.parser.previous.token_type {
+    match operator_type {
       TokenType::TokenPlus => self.emit_byte(Byte::Op(OpCode::OpAdd)),
       TokenType::TokenMinus => self.emit_byte(Byte::Op(OpCode::OpSubtract)),
       TokenType::TokenStar => self.emit_byte(Byte::Op(OpCode::OpMultiply)),
@@ -339,7 +342,7 @@ impl<'compiler> Compiler<'compiler> {
       // pass
     } else {
       print!(
-        " at {} on line {}",
+        " at {:?} on line {}",
         str::from_utf8(token.text).unwrap(),
         token.line
       );
@@ -350,7 +353,7 @@ impl<'compiler> Compiler<'compiler> {
   }
 
   fn expression(&mut self) {
-    self.parse_precedence(Precedence::PrecedenceUnary);
+    self.parse_precedence(Precedence::PrecedenceAssignment);
   }
 
   fn get_rule(&self, token_type: TokenType) -> &ParseRule {
@@ -396,10 +399,10 @@ impl<'compiler> Compiler<'compiler> {
       _ => unreachable!(),
     }
 
-    while precedence <= self.get_rule(token_type).precedence {
+    while precedence <= self.get_rule(self.parser.current.token_type).precedence {
       self.advance();
-      let infix_rule = self.get_rule(token_type).infix;
-      match infix_rule.as_ref() {
+      let infix_rule = self.get_rule(self.parser.previous.token_type).infix;
+      match infix_rule {
         "grouping" => self.grouping(),
         "binary" => self.binary(),
         "unary" => self.unary(),

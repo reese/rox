@@ -48,7 +48,9 @@ pub enum TokenType {
 }
 
 impl Default for TokenType {
-  fn default() -> TokenType { TokenType::TokenDefault }
+  fn default() -> TokenType {
+    TokenType::TokenDefault
+  }
 }
 
 #[derive(Clone, Debug, Default)]

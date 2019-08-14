@@ -8,6 +8,9 @@ edition = "2018"
 
 [dependencies]
 text_io = "0.1.7"
+matches = "*"
+num-traits = "*"
+num-derive = "*"
 
 [dev-dependencies]
-yotsuba = "0.0.1"
+yotsuba = "*"

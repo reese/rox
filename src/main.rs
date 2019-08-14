@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate text_io;
+#[macro_use]
+extern crate matches;
 
 use std::env::args;
 use std::fs;
@@ -10,30 +12,15 @@ mod lib;
 use lib::*;
 
 fn main() {
-    let arguments: Vec<String> = args().collect();
-    if arguments.len() == 1 {
-      repl();
-    } else if arguments.len() == 2 {
-      run_file(&arguments[1]);
-    } else {
-      panic!("Usage: rox [path_to_run]")
-    }
-    exit(0);
-    // let mut chunk = Chunk::new();
-    // chunk.push_line(OpCode::OpConstant, 123);
-    // chunk.push_line(Value { f: 1.2 }, 123);
-    // chunk.push_line(OpCode::OpConstant, 7);
-    // chunk.push_line(Value { f: 78 as f64 }, 7);
-    // chunk.push_line(OpCode::OpNegate, 123);
-    // chunk.push_line(OpCode::OpConstant, 7);
-    // chunk.push_line(Value { f: 4 as f64 }, 7);
-    // chunk.push_line(OpCode::OpConstant, 7);
-    // chunk.push_line(Value { f: 5 as f64 }, 7);
-    // chunk.push_line(OpCode::OpSubtract, 7);
-    // chunk.push_line(OpCode::OpReturn, 7);
-    // let mut vm = VM::new(chunk);
-    // vm.interpret();
-    // println!("{:?}", vm)
+  let arguments: Vec<String> = args().collect();
+  if arguments.len() == 1 {
+    repl();
+  } else if arguments.len() == 2 {
+    run_file(&arguments[1]);
+  } else {
+    panic!("Usage: rox [path_to_run]")
+  }
+  exit(0);
 }
 
 fn run_file(path: &String) -> std::io::Result<()> {
@@ -53,8 +40,9 @@ fn repl() {
     io::stdout().flush().unwrap();
 
     let input_string: String = read!();
+    println!("{:?}", input_string);
     if input_string == String::from("exit()") {
-      println!("\nexit");
+      println!("exit");
       break;
     }
 
@@ -66,5 +54,5 @@ fn interpret(input: Vec<u8>) -> InterpretResult {
   let chunk = &mut Chunk::new();
   let mut compiler = Compiler::new(&input, chunk);
   compiler.compile();
-  return InterpretResult::InterpretOk
+  return InterpretResult::InterpretOk;
 }
