@@ -16,7 +16,7 @@ fn main() {
   if arguments.len() == 1 {
     repl();
   } else if arguments.len() == 2 {
-    run_file(&arguments[1]);
+    run_file(&arguments[1]).unwrap();
   } else {
     panic!("Usage: rox [path_to_run]")
   }
@@ -25,6 +25,7 @@ fn main() {
 
 fn run_file(path: &String) -> std::io::Result<()> {
   let source = fs::read(path)?;
+  println!("{:?}", source);
   let result: InterpretResult = interpret(source);
   match result {
     InterpretResult::InterpretCompileError => exit(65),
@@ -52,7 +53,5 @@ fn repl() {
 
 fn interpret(input: Vec<u8>) -> InterpretResult {
   let chunk = &mut Chunk::new();
-  let mut compiler = Compiler::new(&input, chunk);
-  compiler.compile();
-  return InterpretResult::InterpretOk;
+  VM::new(chunk).interpret(input)
 }

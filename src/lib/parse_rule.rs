@@ -1,7 +1,15 @@
 use super::precedence::Precedence;
 
-pub struct ParseRule<'a> {
-  pub prefix: &'a str,
-  pub infix: &'a str,
-  pub precedence: Precedence
+pub enum ParseOp {
+  Number,
+  Grouping,
+  Unary,
+  Binary,
+  Noop,
+}
+
+pub struct ParseRule {
+  pub prefix: ParseOp,
+  pub infix: ParseOp,
+  pub precedence: Precedence,
 }

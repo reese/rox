@@ -1,7 +1,7 @@
-use super::interpret_result::InterpretResult;
 use super::chunk::{Byte, Chunk};
 use super::common::OpCode;
 use super::compile::Compiler;
+use super::interpret_result::InterpretResult;
 use super::value::Value;
 
 #[derive(Debug)]
@@ -13,36 +13,34 @@ pub struct VM<'a> {
 
 impl<'vm, 'chunk> VM<'vm> {
   pub fn new(chunk: &'chunk mut Chunk) -> VM {
-    return VM { 
+    return VM {
       chunk: chunk,
       ips: vec![],
-      stack: vec![]
-    }
+      stack: vec![],
+    };
   }
 
   pub fn interpret(&mut self, source: Vec<u8>) -> InterpretResult {
     let mut compiler = Compiler::new(&source, self.chunk);
     if !compiler.compile() {
-      return InterpretResult::InterpretCompileError
+      return InterpretResult::InterpretCompileError;
     }
     self.ips = self.chunk.codes.to_vec();
-    let result = self.run();
-    return result
+    self.run()
   }
 
   fn run(&mut self) -> InterpretResult {
     let mut code_index = 0;
     let mut constant_index = 0;
     while code_index < self.ips.len() {
-      match self.ips[code_index] {
+      match &self.ips[code_index] {
         Byte::Op(OpCode::OpReturn) => {
-          println!("{:?}", self.stack.pop());
-          return InterpretResult::InterpretOk
-        },
+          return InterpretResult::InterpretOk;
+        }
         Byte::Op(OpCode::OpNegate) => {
           let next_constant = self.get_next_constant();
           self.stack.push(-next_constant)
-        },
+        }
         Byte::Op(OpCode::OpAdd) => self.binary_operation("+"),
         Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
         Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
@@ -50,13 +48,14 @@ impl<'vm, 'chunk> VM<'vm> {
         Byte::Op(OpCode::OpConstant) => {
           let constant = &self.chunk.constants.values[constant_index];
           constant_index += 1;
+          code_index += 1;
           &self.stack.push(constant.clone());
-        },
-        _ => unreachable!(),
+        }
+        byte_code => unreachable!("Encountered unexpected operation: {:?}", byte_code),
       }
       code_index += 1;
     }
-    return InterpretResult::InterpretCompileError
+    return InterpretResult::InterpretCompileError;
   }
 
   fn binary_operation(&mut self, operation: &str) {
@@ -67,7 +66,7 @@ impl<'vm, 'chunk> VM<'vm> {
       "-" => first - second,
       "*" => first * second,
       "/" => first / second,
-      _ => panic!("Unknown binary operation attempted.")
+      _ => panic!("Unknown binary operation attempted."),
     };
     self.stack.push(result)
   }
@@ -79,4 +78,3 @@ impl<'vm, 'chunk> VM<'vm> {
     }
   }
 }
-

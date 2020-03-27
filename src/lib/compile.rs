@@ -3,7 +3,7 @@ use std::str;
 
 use super::chunk::{Byte, Chunk};
 use super::common::OpCode;
-use super::parse_rule::ParseRule;
+use super::parse_rule::{ParseOp, ParseRule};
 use super::parser::Parser;
 use super::precedence::Precedence;
 use super::scanner::Scanner;
@@ -12,216 +12,215 @@ use super::traits::PushLine;
 use super::value::Value;
 
 const U8_MAX: u8 = 255;
-const NULL_FUNC: &str = "null";
 const RULES: [ParseRule; 42] = [
   ParseRule {
-    prefix: "grouping",
-    infix: NULL_FUNC,
+    prefix: ParseOp::Grouping,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Left Paren
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Right Paren
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Left Brace
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Right Brace
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Comma
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Dot
   ParseRule {
-    prefix: "unary",
-    infix: "binary",
+    prefix: ParseOp::Unary,
+    infix: ParseOp::Binary,
     precedence: Precedence::PrecedenceTerm,
   }, // Minus
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: "binary",
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Binary,
     precedence: Precedence::PrecedenceTerm,
   }, // Plus
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Semicolon
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: "binary",
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Binary,
     precedence: Precedence::PrecedenceFactor,
   }, // Slash
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: "binary",
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Binary,
     precedence: Precedence::PrecedenceFactor,
   }, // Star
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Bang
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // BangEqual
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Equal
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Double Equal
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Greater
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Greater Equal
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Less
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Less Equal
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Identifier
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // String
   ParseRule {
-    prefix: "number",
-    infix: NULL_FUNC,
+    prefix: ParseOp::Number,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Number
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // And
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Class
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Else
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Class
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Else
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // False
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // For
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Fn
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // If
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Nil
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Or
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Print
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Return
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Super
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // This
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // True
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Var
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // While
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // Error
   ParseRule {
-    prefix: NULL_FUNC,
-    infix: NULL_FUNC,
+    prefix: ParseOp::Noop,
+    infix: ParseOp::Noop,
     precedence: Precedence::PrecedenceNone,
   }, // EOF
 ];
@@ -249,7 +248,7 @@ impl<'compiler> Compiler<'compiler> {
 
     self.end_compile();
 
-    return !self.parser.hadError;
+    return !self.parser.had_error;
   }
 
   pub fn advance(&mut self) {
@@ -286,7 +285,7 @@ impl<'compiler> Compiler<'compiler> {
       TokenType::TokenMinus => self.emit_byte(Byte::Op(OpCode::OpSubtract)),
       TokenType::TokenStar => self.emit_byte(Byte::Op(OpCode::OpMultiply)),
       TokenType::TokenSlash => self.emit_byte(Byte::Op(OpCode::OpDivide)),
-      _ => unreachable!(),
+      other => unreachable!("Attempted to parse a binary operator, got {:?}", other),
     }
   }
 
@@ -349,7 +348,7 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     println!("\n{}", message);
-    self.parser.hadError = true;
+    self.parser.had_error = true;
   }
 
   fn expression(&mut self) {
@@ -389,26 +388,25 @@ impl<'compiler> Compiler<'compiler> {
   fn parse_precedence(&mut self, precedence: Precedence) {
     self.advance();
     let token_type = self.parser.previous.token_type.clone();
-    let prefix_rule = self.get_rule(token_type).prefix;
+    let prefix_rule = &self.get_rule(token_type).prefix;
     match prefix_rule {
-      "grouping" => self.grouping(),
-      "binary" => self.binary(),
-      "unary" => self.unary(),
-      "number" => self.number(),
-      "null" => self.error("Expected expression."),
+      ParseOp::Grouping => self.grouping(),
+      ParseOp::Binary => self.binary(),
+      ParseOp::Unary => self.unary(),
+      ParseOp::Number => self.number(),
+      ParseOp::Noop => self.error("Expected expression."),
       _ => unreachable!(),
     }
 
     while precedence <= self.get_rule(self.parser.current.token_type).precedence {
       self.advance();
-      let infix_rule = self.get_rule(self.parser.previous.token_type).infix;
+      let infix_rule = &self.get_rule(self.parser.previous.token_type).infix;
       match infix_rule {
-        "grouping" => self.grouping(),
-        "binary" => self.binary(),
-        "unary" => self.unary(),
-        "number" => self.number(),
-        "null" => self.error("Expected expression."),
-        _ => unreachable!(),
+        ParseOp::Grouping => self.grouping(),
+        ParseOp::Binary => self.binary(),
+        ParseOp::Unary => self.unary(),
+        ParseOp::Number => self.number(),
+        ParseOp::Noop => self.error("Expected expression."),
       }
     }
   }
