@@ -3,13 +3,13 @@ extern crate text_io;
 #[macro_use]
 extern crate matches;
 
+use lib::{Chunk, InterpretError, InterpretErrorType, RoxResult, Value, VM};
 use std::env::args;
 use std::fs;
 use std::io::{self, Write};
 use std::process::exit;
 
 mod lib;
-use lib::*;
 
 fn main() {
   let arguments: Vec<String> = args().collect();
@@ -25,12 +25,23 @@ fn main() {
 
 fn run_file(path: &String) -> std::io::Result<()> {
   let source = fs::read(path)?;
-  println!("{:?}", source);
-  let result: InterpretResult = interpret(source);
+  let result = interpret(source);
   match result {
-    InterpretResult::InterpretCompileError => exit(65),
-    InterpretResult::InterpretRuntimeError => exit(70),
-    _ => exit(0),
+    Err(InterpretError { error_type, .. })
+      if error_type == InterpretErrorType::InterpretCompileError =>
+    {
+      exit(65)
+    }
+    Err(InterpretError { error_type, .. })
+      if error_type == InterpretErrorType::InterpretRuntimeError =>
+    {
+      exit(70)
+    }
+    Err(_) => exit(1),
+    Ok(val) => {
+      println!("{:?}", val);
+      exit(0)
+    }
   };
 }
 
@@ -47,11 +58,11 @@ fn repl() {
       break;
     }
 
-    interpret(input_string.as_bytes().to_vec());
+    interpret(input_string.as_bytes().to_vec()).unwrap();
   }
 }
 
-fn interpret(input: Vec<u8>) -> InterpretResult {
+fn interpret(input: Vec<u8>) -> RoxResult<Value> {
   let chunk = &mut Chunk::new();
   VM::new(chunk).interpret(input)
 }

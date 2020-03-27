@@ -1,7 +1,7 @@
 use super::chunk::{Byte, Chunk};
 use super::common::OpCode;
 use super::compile::Compiler;
-use super::interpret_result::InterpretResult;
+use super::interpret_result::{InterpretError, RoxResult};
 use super::value::Value;
 
 #[derive(Debug)]
@@ -20,22 +20,22 @@ impl<'vm, 'chunk> VM<'vm> {
     };
   }
 
-  pub fn interpret(&mut self, source: Vec<u8>) -> InterpretResult {
+  pub fn interpret(&mut self, source: Vec<u8>) -> RoxResult<Value> {
     let mut compiler = Compiler::new(&source, self.chunk);
     if !compiler.compile() {
-      return InterpretResult::InterpretCompileError;
+      return Err(InterpretError::compile_error());
     }
     self.ips = self.chunk.codes.to_vec();
     self.run()
   }
 
-  fn run(&mut self) -> InterpretResult {
+  fn run(&mut self) -> RoxResult<Value> {
     let mut code_index = 0;
     let mut constant_index = 0;
     while code_index < self.ips.len() {
       match &self.ips[code_index] {
         Byte::Op(OpCode::OpReturn) => {
-          return InterpretResult::InterpretOk;
+          return Ok(self.get_next_constant());
         }
         Byte::Op(OpCode::OpNegate) => {
           let next_constant = self.get_next_constant();
@@ -55,7 +55,7 @@ impl<'vm, 'chunk> VM<'vm> {
       }
       code_index += 1;
     }
-    return InterpretResult::InterpretCompileError;
+    return Err(InterpretError::compile_error());
   }
 
   fn binary_operation(&mut self, operation: &str) {
@@ -63,9 +63,9 @@ impl<'vm, 'chunk> VM<'vm> {
     let second = self.get_next_constant();
     let result = match operation {
       "+" => first + second,
-      "-" => first - second,
+      "-" => second - first,
       "*" => first * second,
-      "/" => first / second,
+      "/" => second / first,
       _ => panic!("Unknown binary operation attempted."),
     };
     self.stack.push(result)
