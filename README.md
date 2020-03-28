@@ -1,6 +1,8 @@
-<h1 align="center">Rox</h1>
+<div align="center">
+<h1>Rox</h1>
 
-![test](./assets/geodude.png)
+<img src="./assets/geodude.png"  alt="Geodude"/>
+</div>
 
 ## Building from source
 
