@@ -1,6 +1,6 @@
 use num_derive::FromPrimitive;
 
-#[derive(Clone, Debug, FromPrimitive, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, FromPrimitive, PartialEq, PartialOrd)]
 pub enum Precedence {
     PrecedenceNone,
     PrecedenceAssignment,

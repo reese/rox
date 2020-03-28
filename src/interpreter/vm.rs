@@ -13,11 +13,11 @@ pub struct VM<'a> {
 
 impl<'vm, 'chunk> VM<'vm> {
     pub fn new(chunk: &'chunk mut Chunk) -> VM {
-        return VM {
-            chunk: chunk,
+        VM {
+            chunk,
             ips: vec![],
             stack: vec![],
-        };
+        }
     }
 
     pub fn interpret(&mut self, source: Vec<u8>) -> RoxResult<Value> {
@@ -49,7 +49,7 @@ impl<'vm, 'chunk> VM<'vm> {
                     let constant = &self.chunk.constants.values[constant_index];
                     constant_index += 1;
                     code_index += 1;
-                    &self.stack.push(constant.clone());
+                    self.stack.push(constant.clone());
                 }
                 byte_code => unreachable!(
                     "Encountered unexpected operation: {:?}",
@@ -58,7 +58,7 @@ impl<'vm, 'chunk> VM<'vm> {
             }
             code_index += 1;
         }
-        return Err(InterpretError::compile_error());
+        Err(InterpretError::compile_error())
     }
 
     fn binary_operation(&mut self, operation: &str) {
@@ -76,7 +76,7 @@ impl<'vm, 'chunk> VM<'vm> {
 
     fn get_next_constant(&mut self) -> Value {
         match self.stack.pop() {
-            Some(x) => return x,
+            Some(x) => x,
             None => panic!("Nothing on the constants stack to pop"),
         }
     }

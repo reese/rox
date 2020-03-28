@@ -11,7 +11,6 @@ use super::token::{Token, TokenType};
 use super::traits::PushLine;
 use super::value::Value;
 
-const U8_MAX: u8 = 255;
 const RULES: [ParseRule; 42] = [
     ParseRule {
         prefix: ParseOp::Grouping,
@@ -234,24 +233,23 @@ pub struct Compiler<'a> {
 
 impl<'compiler> Compiler<'compiler> {
     pub fn new(
-        source: &'compiler Vec<u8>,
+        source: &'compiler [u8],
         chunk: &'compiler mut Chunk,
     ) -> Compiler<'compiler> {
-        return Compiler {
+        Compiler {
             scanner: Scanner::new(source),
             parser: Parser::default(),
             compiling_chunk: chunk,
-        };
+        }
     }
 
     pub fn compile(&'compiler mut self) -> bool {
         self.advance();
         self.expression();
         self.consume(TokenType::TokenEof, "Expected end of expression");
-
         self.end_compile();
 
-        return !self.parser.had_error;
+        !self.parser.had_error
     }
 
     pub fn advance(&mut self) {
@@ -277,11 +275,11 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn binary(&mut self) {
-        let operator_type = self.parser.previous.token_type.clone();
+        let operator_type = self.parser.previous.token_type;
 
         let rule = self.get_rule(operator_type);
         let precedence: Precedence =
-            FromPrimitive::from_u8(rule.precedence.clone() as u8 + 1).unwrap();
+            FromPrimitive::from_u8(rule.precedence as u8 + 1).unwrap();
         self.parse_precedence(precedence.clone());
 
         match operator_type {
@@ -301,7 +299,7 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn current_chunk(&mut self) -> &mut Chunk {
-        return self.compiling_chunk;
+        self.compiling_chunk
     }
 
     fn emit_byte(&mut self, byte: Byte) {
@@ -369,9 +367,9 @@ impl<'compiler> Compiler<'compiler> {
         self.parse_precedence(Precedence::PrecedenceAssignment);
     }
 
-    fn get_rule(&self, token_type: TokenType) -> &ParseRule {
+    fn get_rule(&self, token_type: TokenType) -> ParseRule {
         let index = token_type as usize;
-        &RULES[index]
+        RULES[index]
     }
 
     fn grouping(&mut self) {
@@ -385,13 +383,7 @@ impl<'compiler> Compiler<'compiler> {
     fn make_constant(&mut self, value: Value) -> u8 {
         let line = self.scanner.line;
         let chunk = self.current_chunk();
-        let constant = chunk.push_line(value, line);
-        if constant > U8_MAX {
-            self.error("Too many constants in one chunk.");
-            return 0;
-        }
-
-        return constant;
+        chunk.push_line(value, line)
     }
 
     fn number(&mut self) {
@@ -404,8 +396,21 @@ impl<'compiler> Compiler<'compiler> {
 
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
-        let token_type = self.parser.previous.token_type.clone();
-        let prefix_rule = &self.get_rule(token_type).prefix;
+        let token_type = self.parser.previous.token_type;
+        let prefix_rule = self.get_rule(token_type);
+        self.match_rule(prefix_rule.prefix);
+
+        while precedence
+            <= self.get_rule(self.parser.current.token_type).precedence
+        {
+            self.advance();
+            let infix_rule =
+                self.get_rule(self.parser.previous.token_type).infix;
+            self.match_rule(infix_rule);
+        }
+    }
+
+    fn match_rule(&mut self, prefix_rule: ParseOp) {
         match prefix_rule {
             ParseOp::Grouping => self.grouping(),
             ParseOp::Binary => self.binary(),
@@ -413,25 +418,10 @@ impl<'compiler> Compiler<'compiler> {
             ParseOp::Number => self.number(),
             ParseOp::Noop => self.error("Expected expression."),
         }
-
-        while precedence
-            <= self.get_rule(self.parser.current.token_type).precedence
-        {
-            self.advance();
-            let infix_rule =
-                &self.get_rule(self.parser.previous.token_type).infix;
-            match infix_rule {
-                ParseOp::Grouping => self.grouping(),
-                ParseOp::Binary => self.binary(),
-                ParseOp::Unary => self.unary(),
-                ParseOp::Number => self.number(),
-                ParseOp::Noop => self.error("Expected expression."),
-            }
-        }
     }
 
     fn unary(&mut self) {
-        let operator_type = self.parser.previous.token_type.clone();
+        let operator_type = self.parser.previous.token_type;
 
         self.parse_precedence(Precedence::PrecedenceUnary);
 

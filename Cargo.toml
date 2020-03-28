@@ -4,6 +4,14 @@ version = "0.0.1"
 authors = ["Reese Williams <reese@reesew.io>"]
 edition = "2018"
 
+[lib]
+name = "rox"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rox"
+path = "src/bin/rox.rs"
+
 [dependencies]
 text_io = "0.1.7"
 num-traits = "*"

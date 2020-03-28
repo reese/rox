@@ -1,5 +1,6 @@
 use super::precedence::Precedence;
 
+#[derive(Clone, Copy)]
 pub enum ParseOp {
     Number,
     Grouping,
@@ -8,6 +9,7 @@ pub enum ParseOp {
     Noop,
 }
 
+#[derive(Clone, Copy)]
 pub struct ParseRule {
     pub prefix: ParseOp,
     pub infix: ParseOp,

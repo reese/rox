@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 pub use chunk::*;
 pub use common::*;
 pub use compile::*;

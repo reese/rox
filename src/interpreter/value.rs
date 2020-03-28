@@ -10,43 +10,43 @@ pub struct Value {
 impl Add for Value {
     type Output = Self;
     fn add(self, other: Self) -> Value {
-        return Value {
+        Value {
             float: self.float + other.float,
-        };
+        }
     }
 }
 
 impl Div for Value {
     type Output = Self;
     fn div(self, other: Self) -> Value {
-        return Value {
+        Value {
             float: self.float / other.float,
-        };
+        }
     }
 }
 
 impl Mul for Value {
     type Output = Self;
     fn mul(self, other: Self) -> Value {
-        return Value {
+        Value {
             float: self.float * other.float,
-        };
+        }
     }
 }
 
 impl Neg for Value {
     type Output = Value;
     fn neg(self) -> Value {
-        return Value { float: -self.float };
+        Value { float: -self.float }
     }
 }
 
 impl Sub for Value {
     type Output = Self;
     fn sub(self, other: Self) -> Value {
-        return Value {
+        Value {
             float: self.float - other.float,
-        };
+        }
     }
 }
 
@@ -57,15 +57,15 @@ pub struct ValueArray {
 
 impl ValueArray {
     pub fn new() -> ValueArray {
-        return ValueArray { values: vec![] };
+        ValueArray { values: vec![] }
     }
 }
 
 impl Clone for ValueArray {
     fn clone(&self) -> ValueArray {
-        return ValueArray {
+        ValueArray {
             values: self.values.clone(),
-        };
+        }
     }
 }
 
