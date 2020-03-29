@@ -1,3 +1,5 @@
+pub type RoxResult<T> = std::result::Result<T, InterpretError>;
+
 #[derive(Debug, PartialEq)]
 pub enum InterpretErrorType {
     InterpretCompileError,
@@ -11,19 +13,17 @@ pub struct InterpretError {
 }
 
 impl InterpretError {
-    pub fn compile_error() -> Self {
-        InterpretError {
+    pub fn compile_error<T>() -> RoxResult<T> {
+        Err(InterpretError {
             error_type: InterpretErrorType::InterpretCompileError,
             message: None,
-        }
+        })
     }
 
-    pub fn runtime_error() -> Self {
-        InterpretError {
+    pub fn runtime_error<T>(message: &str) -> RoxResult<T> {
+        Err(InterpretError {
             error_type: InterpretErrorType::InterpretRuntimeError,
-            message: None,
-        }
+            message: Some(String::from(message)),
+        })
     }
 }
-
-pub type RoxResult<T> = std::result::Result<T, InterpretError>;

@@ -388,9 +388,7 @@ impl<'compiler> Compiler<'compiler> {
 
     fn number(&mut self) {
         let string = str::from_utf8(self.parser.previous.text).unwrap();
-        let value = Value {
-            float: string.parse().unwrap(),
-        };
+        let value = Value::Float(string.parse().unwrap());
         self.emit_constant(value);
     }
 

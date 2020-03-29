@@ -23,7 +23,7 @@ impl<'vm, 'chunk> VM<'vm> {
     pub fn interpret(&mut self, source: Vec<u8>) -> RoxResult<Value> {
         let mut compiler = Compiler::new(&source, self.chunk);
         if !compiler.compile() {
-            return Err(InterpretError::compile_error());
+            return InterpretError::compile_error();
         }
         self.ips = self.chunk.codes.to_vec();
         self.run()
@@ -58,20 +58,23 @@ impl<'vm, 'chunk> VM<'vm> {
             }
             code_index += 1;
         }
-        Err(InterpretError::compile_error())
+        InterpretError::compile_error()
     }
 
     fn binary_operation(&mut self, operation: &str) {
         let first = self.get_next_constant();
         let second = self.get_next_constant();
         let result = match operation {
-            "+" => first + second,
-            "-" => second - first,
-            "*" => first * second,
-            "/" => second / first,
+            "+" => second.add(first),
+            "-" => second.subtract(first),
+            "*" => second.multiply(first),
+            "/" => second.divide(first),
             _ => panic!("Unknown binary operation attempted."),
         };
-        self.stack.push(result)
+        match result {
+            Ok(val) => self.stack.push(val),
+            Err(error) => panic!(error.message),
+        }
     }
 
     fn get_next_constant(&mut self) -> Value {

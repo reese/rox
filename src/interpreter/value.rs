@@ -1,51 +1,57 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
-
 use super::traits::Push;
+use crate::interpreter::RoxResult;
+use std::ops::Neg;
 
 #[derive(Clone, Debug)]
-pub struct Value {
-    pub float: f64,
+pub enum Value {
+    Bool(bool),
+    Float(f64),
+    Nil,
 }
 
-impl Add for Value {
-    type Output = Self;
-    fn add(self, other: Self) -> Value {
-        Value {
-            float: self.float + other.float,
+impl Value {
+    pub fn add(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Float(first + second))
+            }
+            _ => panic!("Cannot add two non-float types."),
         }
     }
-}
 
-impl Div for Value {
-    type Output = Self;
-    fn div(self, other: Self) -> Value {
-        Value {
-            float: self.float / other.float,
+    pub fn subtract(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Float(first - second))
+            }
+            _ => panic!("Cannot subtract two non-float types."),
         }
     }
-}
 
-impl Mul for Value {
-    type Output = Self;
-    fn mul(self, other: Self) -> Value {
-        Value {
-            float: self.float * other.float,
+    pub fn divide(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Float(first / second))
+            }
+            _ => panic!("Cannot divide two non-float types."),
+        }
+    }
+    pub fn multiply(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Float(first * second))
+            }
+            _ => panic!("Cannot multiply two non-float types."),
         }
     }
 }
 
 impl Neg for Value {
-    type Output = Value;
-    fn neg(self) -> Value {
-        Value { float: -self.float }
-    }
-}
-
-impl Sub for Value {
     type Output = Self;
-    fn sub(self, other: Self) -> Value {
-        Value {
-            float: self.float - other.float,
+    fn neg(self) -> Self {
+        match self {
+            Value::Float(num) => Value::Float(-num),
+            _ => panic!("Cannot negate non-numeric type."),
         }
     }
 }
