@@ -32,7 +32,6 @@ pub enum TokenType {
     TokenFor,
     TokenFn,
     TokenIf,
-    TokenNil,
     TokenOr,
     TokenPrint,
     TokenReturn,

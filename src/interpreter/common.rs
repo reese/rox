@@ -3,7 +3,7 @@ pub enum OpCode {
     OpConstant,
     OpTrue,
     OpFalse,
-    OpNil,
+    OpNot,
     OpAdd,
     OpSubtract,
     OpMultiply,

@@ -6,7 +6,6 @@ use std::ops::Neg;
 pub enum Value {
     Bool(bool),
     Float(f64),
-    Nil,
 }
 
 impl Value {
@@ -67,6 +66,16 @@ impl Neg for Value {
         match self {
             Value::Float(num) => Value::Float(-num),
             _ => panic!("Cannot negate non-numeric type."),
+        }
+    }
+}
+
+impl std::ops::Not for Value {
+    type Output = Self;
+    fn not(self) -> Self {
+        match self {
+            Value::Bool(val) => Value::Bool(!val),
+            _ => panic!("Cannot apply unary operator `!` to non-bool Value."),
         }
     }
 }

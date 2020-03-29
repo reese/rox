@@ -10,9 +10,8 @@ use super::scanner::Scanner;
 use super::token::{Token, TokenType};
 use super::traits::PushLine;
 use super::value::Value;
-use std::hint::unreachable_unchecked;
 
-const RULES: [ParseRule; 40] = [
+const RULES: [ParseRule; 39] = [
     ParseRule {
         prefix: ParseOp::Grouping,
         infix: ParseOp::Noop,
@@ -69,7 +68,7 @@ const RULES: [ParseRule; 40] = [
         precedence: Precedence::PrecedenceFactor,
     }, // Star
     ParseRule {
-        prefix: ParseOp::Noop,
+        prefix: ParseOp::Unary,
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // Bang
@@ -158,11 +157,6 @@ const RULES: [ParseRule; 40] = [
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // If
-    ParseRule {
-        prefix: ParseOp::Literal,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
-    }, // Nil
     ParseRule {
         prefix: ParseOp::Noop,
         infix: ParseOp::Noop,
@@ -417,6 +411,7 @@ impl<'compiler> Compiler<'compiler> {
 
         match operator_type {
             TokenType::TokenMinus => self.emit_byte(Byte::Op(OpCode::OpNegate)),
+            TokenType::TokenBang => self.emit_byte(Byte::Op(OpCode::OpNot)),
             _ => unreachable!(),
         }
     }
@@ -425,7 +420,6 @@ impl<'compiler> Compiler<'compiler> {
         match self.parser.previous.token_type {
             TokenType::TokenFalse => self.emit_byte(Byte::Op(OpCode::OpFalse)),
             TokenType::TokenTrue => self.emit_byte(Byte::Op(OpCode::OpTrue)),
-            TokenType::TokenNil => self.emit_byte(Byte::Op(OpCode::OpNil)),
             _ => unreachable!(),
         }
     }

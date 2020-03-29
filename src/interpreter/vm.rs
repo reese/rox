@@ -3,6 +3,7 @@ use super::common::OpCode;
 use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
 use super::value::Value;
+use std::ops::Not;
 
 #[derive(Debug)]
 pub struct VM<'a> {
@@ -51,9 +52,19 @@ impl<'vm, 'chunk> VM<'vm> {
                         self.stack.push(-next_constant)
                     }
                 }
+                Byte::Op(OpCode::OpNot) => {
+                    if !self.peek(0).is_bool() {
+                        result = Some(self.runtime_error(
+                            index,
+                            "Could not negate non-bool type.",
+                        ))
+                    } else {
+                        let next_constant = self.get_next_constant();
+                        self.stack.push(!next_constant);
+                    }
+                }
                 Byte::Op(OpCode::OpTrue) => self.bool(true),
                 Byte::Op(OpCode::OpFalse) => self.bool(false),
-                Byte::Op(OpCode::OpNil) => self.nil(),
                 Byte::Op(OpCode::OpAdd) => self.binary_operation("+"),
                 Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
                 Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
@@ -97,10 +108,6 @@ impl<'vm, 'chunk> VM<'vm> {
 
     fn bool(&mut self, val: bool) {
         self.stack.push(Value::Bool(val));
-    }
-
-    fn nil(&mut self) {
-        self.stack.push(Value::Nil);
     }
 
     fn peek(&self, distance: usize) -> &Value {
