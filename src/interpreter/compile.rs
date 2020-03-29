@@ -10,8 +10,9 @@ use super::scanner::Scanner;
 use super::token::{Token, TokenType};
 use super::traits::PushLine;
 use super::value::Value;
+use std::hint::unreachable_unchecked;
 
-const RULES: [ParseRule; 42] = [
+const RULES: [ParseRule; 40] = [
     ParseRule {
         prefix: ParseOp::Grouping,
         infix: ParseOp::Noop,
@@ -138,17 +139,7 @@ const RULES: [ParseRule; 42] = [
         precedence: Precedence::PrecedenceNone,
     }, // Else
     ParseRule {
-        prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
-    }, // Class
-    ParseRule {
-        prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
-    }, // Else
-    ParseRule {
-        prefix: ParseOp::Noop,
+        prefix: ParseOp::Literal,
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // False
@@ -168,7 +159,7 @@ const RULES: [ParseRule; 42] = [
         precedence: Precedence::PrecedenceNone,
     }, // If
     ParseRule {
-        prefix: ParseOp::Noop,
+        prefix: ParseOp::Literal,
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // Nil
@@ -198,7 +189,7 @@ const RULES: [ParseRule; 42] = [
         precedence: Precedence::PrecedenceNone,
     }, // This
     ParseRule {
-        prefix: ParseOp::Noop,
+        prefix: ParseOp::Literal,
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // True
@@ -410,11 +401,12 @@ impl<'compiler> Compiler<'compiler> {
 
     fn match_rule(&mut self, prefix_rule: ParseOp) {
         match prefix_rule {
+            ParseOp::Literal => self.literal(),
             ParseOp::Grouping => self.grouping(),
             ParseOp::Binary => self.binary(),
             ParseOp::Unary => self.unary(),
             ParseOp::Number => self.number(),
-            ParseOp::Noop => self.error("Expected expression."),
+            ParseOp::Noop => {}
         }
     }
 
@@ -425,6 +417,15 @@ impl<'compiler> Compiler<'compiler> {
 
         match operator_type {
             TokenType::TokenMinus => self.emit_byte(Byte::Op(OpCode::OpNegate)),
+            _ => unreachable!(),
+        }
+    }
+
+    fn literal(&mut self) {
+        match self.parser.previous.token_type {
+            TokenType::TokenFalse => self.emit_byte(Byte::Op(OpCode::OpFalse)),
+            TokenType::TokenTrue => self.emit_byte(Byte::Op(OpCode::OpTrue)),
+            TokenType::TokenNil => self.emit_byte(Byte::Op(OpCode::OpNil)),
             _ => unreachable!(),
         }
     }

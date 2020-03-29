@@ -30,17 +30,30 @@ impl<'vm, 'chunk> VM<'vm> {
     }
 
     fn run(&mut self) -> RoxResult<Value> {
-        let mut code_index = 0;
+        let mut result = None;
         let mut constant_index = 0;
-        while code_index < self.ips.len() {
-            match &self.ips[code_index] {
+        self.ips
+            .clone()
+            .iter()
+            .enumerate()
+            .for_each(|(index, instruction)| match instruction {
                 Byte::Op(OpCode::OpReturn) => {
-                    return Ok(self.get_next_constant());
+                    result = Some(Ok(self.get_next_constant()));
                 }
                 Byte::Op(OpCode::OpNegate) => {
-                    let next_constant = self.get_next_constant();
-                    self.stack.push(-next_constant)
+                    if !self.peek(0).is_number() {
+                        result = Some(self.runtime_error(
+                            index,
+                            "Could not negate non-number type",
+                        ))
+                    } else {
+                        let next_constant = self.get_next_constant();
+                        self.stack.push(-next_constant)
+                    }
                 }
+                Byte::Op(OpCode::OpTrue) => self.bool(true),
+                Byte::Op(OpCode::OpFalse) => self.bool(false),
+                Byte::Op(OpCode::OpNil) => self.nil(),
                 Byte::Op(OpCode::OpAdd) => self.binary_operation("+"),
                 Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
                 Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
@@ -48,17 +61,15 @@ impl<'vm, 'chunk> VM<'vm> {
                 Byte::Op(OpCode::OpConstant) => {
                     let constant = &self.chunk.constants.values[constant_index];
                     constant_index += 1;
-                    code_index += 1;
                     self.stack.push(constant.clone());
                 }
+                Byte::Constant(x) => println!("constant: {:?}", x),
                 byte_code => unreachable!(
                     "Encountered unexpected operation: {:?}",
                     byte_code
                 ),
-            }
-            code_index += 1;
-        }
-        InterpretError::compile_error()
+            });
+        result.unwrap_or(InterpretError::compile_error())
     }
 
     fn binary_operation(&mut self, operation: &str) {
@@ -82,5 +93,30 @@ impl<'vm, 'chunk> VM<'vm> {
             Some(x) => x,
             None => panic!("Nothing on the constants stack to pop"),
         }
+    }
+
+    fn bool(&mut self, val: bool) {
+        self.stack.push(Value::Bool(val));
+    }
+
+    fn nil(&mut self) {
+        self.stack.push(Value::Nil);
+    }
+
+    fn peek(&self, distance: usize) -> &Value {
+        self.stack
+            .get(distance)
+            .expect("Could not peek into stack.")
+    }
+
+    fn runtime_error<T>(&self, ip_index: usize, message: &str) -> RoxResult<T> {
+        println!(
+            "{}",
+            format!(
+                "Your line number might be {}",
+                self.chunk.lines[ip_index] - 1
+            )
+        );
+        InterpretError::runtime_error(message)
     }
 }

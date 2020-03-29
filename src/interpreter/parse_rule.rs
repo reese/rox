@@ -1,7 +1,8 @@
 use super::precedence::Precedence;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ParseOp {
+    Literal,
     Number,
     Grouping,
     Unary,

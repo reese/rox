@@ -99,7 +99,8 @@ impl<'scanner> Scanner<'scanner> {
         token_type: TokenType,
     ) -> TokenType {
         if (self.current - self.start == start + length)
-            && (&self.source[(self.current + start)..(length + 1)]
+            && (&self.source
+                [(self.start + start)..(self.start + start + length)]
                 == rest.as_bytes())
         {
             return token_type;
@@ -147,7 +148,7 @@ impl<'scanner> Scanner<'scanner> {
             b'w' => self.check_keyword(1, 4, "hile", TokenType::TokenWhile),
             b'f' => {
                 if (self.current - self.start) > 1 {
-                    match self.source[self.current + 1] {
+                    match self.source[self.start + 1] {
                         b'a' => self.check_keyword(
                             2,
                             3,
@@ -168,16 +169,13 @@ impl<'scanner> Scanner<'scanner> {
             }
             b't' => {
                 if (self.current - self.start) > 1 {
-                    match self.source[self.current + 1] {
+                    match self.source[self.start + 1] {
                         b'h' => {
                             self.check_keyword(2, 2, "is", TokenType::TokenThis)
                         }
-                        b'r' => self.check_keyword(
-                            2,
-                            12,
-                            "ue",
-                            TokenType::TokenTrue,
-                        ),
+                        b'r' => {
+                            self.check_keyword(2, 2, "ue", TokenType::TokenTrue)
+                        }
                         _ => TokenType::TokenIdentifier,
                     }
                 } else {

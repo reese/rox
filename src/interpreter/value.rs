@@ -36,12 +36,27 @@ impl Value {
             _ => panic!("Cannot divide two non-float types."),
         }
     }
+
     pub fn multiply(self, other: Self) -> RoxResult<Value> {
         match (self, other) {
             (Value::Float(first), Value::Float(second)) => {
                 Ok(Value::Float(first * second))
             }
             _ => panic!("Cannot multiply two non-float types."),
+        }
+    }
+
+    pub fn is_number(&self) -> bool {
+        match self {
+            Value::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_bool(&self) -> bool {
+        match self {
+            Value::Bool(_) => true,
+            _ => false,
         }
     }
 }
