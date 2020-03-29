@@ -45,6 +45,36 @@ impl Value {
         }
     }
 
+    pub fn equals(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Bool(first == second))
+            }
+            (Value::Bool(first), Value::Bool(second)) => {
+                Ok(Value::Bool(first == second))
+            }
+            _ => panic!("Cannot compare equality of mismatched types"),
+        }
+    }
+
+    pub fn less_than(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Bool(first < second))
+            }
+            _ => panic!("Cannot compare non-float types"),
+        }
+    }
+
+    pub fn greater_than(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Bool(first > second))
+            }
+            _ => panic!("Cannot compare non-float types"),
+        }
+    }
+
     pub fn is_number(&self) -> bool {
         match self {
             Value::Float(_) => true,

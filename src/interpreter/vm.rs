@@ -3,6 +3,7 @@ use super::common::OpCode;
 use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
 use super::value::Value;
+use std::borrow::BorrowMut;
 use std::ops::Not;
 
 #[derive(Debug)]
@@ -41,6 +42,9 @@ impl<'vm, 'chunk> VM<'vm> {
                 Byte::Op(OpCode::OpReturn) => {
                     result = Some(Ok(self.get_next_constant()));
                 }
+                Byte::Op(OpCode::OpEqual) => self.binary_operation("="),
+                Byte::Op(OpCode::OpGreaterThan) => self.binary_operation(">"),
+                Byte::Op(OpCode::OpLessThan) => self.binary_operation("<"),
                 Byte::Op(OpCode::OpNegate) => {
                     if !self.peek(0).is_number() {
                         result = Some(self.runtime_error(
@@ -91,6 +95,9 @@ impl<'vm, 'chunk> VM<'vm> {
             "-" => second.subtract(first),
             "*" => second.multiply(first),
             "/" => second.divide(first),
+            "=" => second.equals(first),
+            ">" => second.greater_than(first),
+            "<" => second.less_than(first),
             _ => panic!("Unknown binary operation attempted."),
         };
         match result {

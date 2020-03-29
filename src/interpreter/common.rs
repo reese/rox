@@ -9,5 +9,8 @@ pub enum OpCode {
     OpMultiply,
     OpDivide,
     OpNegate,
+    OpLessThan,
+    OpGreaterThan,
+    OpEqual,
     OpReturn,
 }

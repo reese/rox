@@ -197,7 +197,7 @@ impl<'scanner> Scanner<'scanner> {
         if self.is_at_end() {
             return false;
         }
-        if self.peek() != expected {
+        if self.peek_next() != expected {
             return false;
         }
         self.advance();

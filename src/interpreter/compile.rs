@@ -10,6 +10,7 @@ use super::scanner::Scanner;
 use super::token::{Token, TokenType};
 use super::traits::PushLine;
 use super::value::Value;
+use crate::interpreter::OpCode::OpConstant;
 
 const RULES: [ParseRule; 39] = [
     ParseRule {
@@ -74,8 +75,8 @@ const RULES: [ParseRule; 39] = [
     }, // Bang
     ParseRule {
         prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
+        infix: ParseOp::Binary,
+        precedence: Precedence::PrecedenceEquality,
     }, // BangEqual
     ParseRule {
         prefix: ParseOp::Noop,
@@ -84,28 +85,28 @@ const RULES: [ParseRule; 39] = [
     }, // Equal
     ParseRule {
         prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
+        infix: ParseOp::Binary,
+        precedence: Precedence::PrecedenceEquality,
     }, // Double Equal
     ParseRule {
         prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
+        infix: ParseOp::Binary,
+        precedence: Precedence::PrecedenceComparison,
     }, // Greater
     ParseRule {
         prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
+        infix: ParseOp::Binary,
+        precedence: Precedence::PrecedenceComparison,
     }, // Greater Equal
     ParseRule {
         prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
+        infix: ParseOp::Binary,
+        precedence: Precedence::PrecedenceEquality,
     }, // Less
     ParseRule {
         prefix: ParseOp::Noop,
-        infix: ParseOp::Noop,
-        precedence: Precedence::PrecedenceNone,
+        infix: ParseOp::Binary,
+        precedence: Precedence::PrecedenceEquality,
     }, // Less Equal
     ParseRule {
         prefix: ParseOp::Noop,
@@ -268,6 +269,25 @@ impl<'compiler> Compiler<'compiler> {
         self.parse_precedence(precedence.clone());
 
         match operator_type {
+            TokenType::TokenBangEqual => self
+                .emit_bytes(Byte::Op(OpCode::OpEqual), Byte::Op(OpCode::OpNot)),
+            TokenType::TokenEqualEqual => {
+                self.emit_byte(Byte::Op(OpCode::OpEqual))
+            }
+            TokenType::TokenLess => {
+                self.emit_byte(Byte::Op(OpCode::OpLessThan))
+            }
+            TokenType::TokenLessEqual => self.emit_bytes(
+                Byte::Op(OpCode::OpGreaterThan),
+                Byte::Op(OpCode::OpNot),
+            ),
+            TokenType::TokenGreater => {
+                self.emit_byte(Byte::Op(OpCode::OpGreaterThan))
+            }
+            TokenType::TokenGreaterEqual => self.emit_bytes(
+                Byte::Op(OpCode::OpLessThan),
+                Byte::Op(OpCode::OpNot),
+            ),
             TokenType::TokenPlus => self.emit_byte(Byte::Op(OpCode::OpAdd)),
             TokenType::TokenMinus => {
                 self.emit_byte(Byte::Op(OpCode::OpSubtract))
