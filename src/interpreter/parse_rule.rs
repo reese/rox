@@ -2,12 +2,13 @@ use super::precedence::Precedence;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ParseOp {
-    Literal,
-    Number,
-    Grouping,
-    Unary,
     Binary,
+    Grouping,
+    Literal,
     Noop,
+    Number,
+    String,
+    Unary,
 }
 
 #[derive(Clone, Copy)]

@@ -84,10 +84,25 @@ impl<'scanner> Scanner<'scanner> {
                     self.make_token(TokenType::TokenLess)
                 }
             }
+            b'"' => self.string(),
             _ => self.error_token(),
         };
 
         self.advance();
+        token
+    }
+
+    fn string(&mut self) -> Token<'scanner> {
+        self.advance();
+        while !self.match_char(b'"') {
+            if self.is_at_end() {
+                return self.error_token();
+            }
+            self.advance();
+        }
+        let token = self.make_token(TokenType::TokenString);
+        self.advance(); // Consume last `"`
+
         token
     }
 

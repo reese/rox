@@ -1,14 +1,23 @@
 use super::traits::Push;
-use crate::interpreter::RoxResult;
+use crate::interpreter::{Object, RoxResult};
 use std::ops::Neg;
+use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub enum Value {
     Bool(bool),
     Float(f64),
+    Object(Rc<Object>),
 }
 
 impl Value {
+    pub fn create_string(string: &[u8]) -> Self {
+        let object = Rc::new(Object::String(
+            String::from_utf8(Vec::from(string)).unwrap(),
+        ));
+        Value::Object(object)
+    }
+
     pub fn add(self, other: Self) -> RoxResult<Value> {
         match (self, other) {
             (Value::Float(first), Value::Float(second)) => {
@@ -85,6 +94,13 @@ impl Value {
     pub fn is_bool(&self) -> bool {
         match self {
             Value::Bool(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_object(&self) -> bool {
+        match self {
+            Value::Object(_) => true,
             _ => false,
         }
     }

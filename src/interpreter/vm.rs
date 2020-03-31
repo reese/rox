@@ -78,7 +78,7 @@ impl<'vm, 'chunk> VM<'vm> {
                     constant_index += 1;
                     self.stack.push(constant.clone());
                 }
-                Byte::Constant(x) => println!("constant: {:?}", x),
+                Byte::Constant(x) => {}
                 byte_code => unreachable!(
                     "Encountered unexpected operation: {:?}",
                     byte_code

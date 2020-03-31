@@ -114,7 +114,7 @@ const RULES: [ParseRule; 39] = [
         precedence: Precedence::PrecedenceNone,
     }, // Identifier
     ParseRule {
-        prefix: ParseOp::Noop,
+        prefix: ParseOp::String,
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // String
@@ -415,12 +415,13 @@ impl<'compiler> Compiler<'compiler> {
 
     fn match_rule(&mut self, prefix_rule: ParseOp) {
         match prefix_rule {
-            ParseOp::Literal => self.literal(),
-            ParseOp::Grouping => self.grouping(),
             ParseOp::Binary => self.binary(),
-            ParseOp::Unary => self.unary(),
+            ParseOp::Grouping => self.grouping(),
+            ParseOp::Literal => self.literal(),
             ParseOp::Number => self.number(),
             ParseOp::Noop => {}
+            ParseOp::String => self.string(),
+            ParseOp::Unary => self.unary(),
         }
     }
 
@@ -442,5 +443,11 @@ impl<'compiler> Compiler<'compiler> {
             TokenType::TokenTrue => self.emit_byte(Byte::Op(OpCode::OpTrue)),
             _ => unreachable!(),
         }
+    }
+
+    fn string(&mut self) {
+        let end = self.parser.previous.text.len();
+        let val = Value::create_string(&self.parser.previous.text[1..]);
+        self.emit_constant(val)
     }
 }
