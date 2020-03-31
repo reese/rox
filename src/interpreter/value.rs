@@ -62,6 +62,9 @@ impl Value {
             (Value::Bool(first), Value::Bool(second)) => {
                 Ok(Value::Bool(first == second))
             }
+            (Value::Object(first), Value::Object(second)) => Ok(Value::Bool(
+                first.as_ref().has_equal_content(second.as_ref()),
+            )),
             _ => panic!("Cannot compare equality of mismatched types"),
         }
     }
