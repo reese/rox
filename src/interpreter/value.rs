@@ -23,6 +23,9 @@ impl Value {
             (Value::Float(first), Value::Float(second)) => {
                 Ok(Value::Float(first + second))
             }
+            (Value::Object(first), Value::Object(second)) => {
+                Ok(Value::Object(Rc::from(first.concatenate(&second))))
+            }
             _ => panic!("Cannot add two non-float types."),
         }
     }
