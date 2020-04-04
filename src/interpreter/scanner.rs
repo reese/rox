@@ -101,7 +101,6 @@ impl<'scanner> Scanner<'scanner> {
             self.advance();
         }
         let token = self.make_token(TokenType::TokenString);
-        self.advance(); // Consume last `"`
 
         token
     }
@@ -158,7 +157,7 @@ impl<'scanner> Scanner<'scanner> {
             b'p' => self.check_keyword(1, 4, "rint", TokenType::TokenPrint),
             b'r' => self.check_keyword(1, 5, "eturn", TokenType::TokenReturn),
             b's' => self.check_keyword(1, 4, "uper", TokenType::TokenSuper),
-            b'v' => self.check_keyword(1, 2, "ar", TokenType::TokenVar),
+            b'l' => self.check_keyword(1, 2, "et", TokenType::TokenLet),
             b'w' => self.check_keyword(1, 4, "hile", TokenType::TokenWhile),
             b'f' => {
                 if (self.current - self.start) > 1 {

@@ -38,7 +38,7 @@ pub enum TokenType {
     TokenSuper,
     TokenThis,
     TokenTrue,
-    TokenVar,
+    TokenLet,
     TokenWhile,
 
     TokenError,

@@ -1,3 +1,5 @@
+use std::fmt::Formatter;
+
 #[derive(Debug)]
 pub enum Object {
     String(String),
@@ -18,5 +20,14 @@ impl Object {
             } // TODO: This should probably be a catch all, since we won't be able to
               // concatenate other Objects (e.g. classes)
         }
+    }
+}
+
+impl std::fmt::Display for Object {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let display_string = match self {
+            Object::String(string) => string,
+        };
+        write!(f, "{}", display_string)
     }
 }

@@ -4,13 +4,17 @@ pub enum OpCode {
     OpTrue,
     OpFalse,
     OpNot,
+
+    OpNegate,
     OpAdd,
     OpSubtract,
     OpMultiply,
     OpDivide,
-    OpNegate,
+
     OpLessThan,
     OpGreaterThan,
     OpEqual,
+
+    OpPrint,
     OpReturn,
 }

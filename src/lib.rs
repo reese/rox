@@ -1,7 +1,6 @@
 #![deny(missing_docs)]
 //! # Rox
-//! `Rox` is an interpreted, dynamically typed language
-//! based on the `Lox` language implemented in Bob Nystrom's
+//! `Rox` is based on the `Lox` language implemented in Bob Nystrom's
 //! series, "Crafting Interpreters."
 
 #[macro_use]

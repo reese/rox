@@ -1,5 +1,6 @@
 use super::traits::Push;
 use crate::interpreter::{Object, RoxResult};
+use std::fmt::Formatter;
 use std::ops::Neg;
 use std::rc::Rc;
 
@@ -132,6 +133,17 @@ impl std::ops::Not for Value {
     }
 }
 
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Object(object) => object.as_ref().fmt(f),
+            Value::Float(num) => write!(f, "{}", num),
+            Value::Bool(val) => write!(f, "{}", val),
+        }
+    }
+}
+
+// TODO: Can we remove this?
 #[derive(Debug)]
 pub struct ValueArray {
     pub values: Vec<Value>,

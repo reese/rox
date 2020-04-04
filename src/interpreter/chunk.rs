@@ -2,6 +2,10 @@ use super::common::OpCode;
 use super::traits::*;
 use super::value::{Value, ValueArray};
 
+// TODO: Why do these both exist?
+// I think constants can be removed
+// so that we only have op codes, because
+// presumably constants will be on the stack
 #[derive(Clone, Debug)]
 pub enum Byte {
     Op(OpCode),
@@ -22,6 +26,10 @@ impl Chunk {
             constants: ValueArray::new(),
             lines: vec![],
         }
+    }
+
+    pub fn constant_at(&self, index: usize) -> &Value {
+        &self.constants.values[index]
     }
 }
 

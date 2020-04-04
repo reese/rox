@@ -3,8 +3,6 @@ use super::common::OpCode;
 use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
 use super::value::Value;
-use std::borrow::BorrowMut;
-use std::ops::Not;
 
 #[derive(Debug)]
 pub struct VM<'a> {
@@ -40,7 +38,7 @@ impl<'vm, 'chunk> VM<'vm> {
             .enumerate()
             .for_each(|(index, instruction)| match instruction {
                 Byte::Op(OpCode::OpReturn) => {
-                    result = Some(Ok(self.get_next_constant()));
+                    result = Some(Ok(Value::Bool(true)));
                 }
                 Byte::Op(OpCode::OpEqual) => self.binary_operation("="),
                 Byte::Op(OpCode::OpGreaterThan) => self.binary_operation(">"),
@@ -73,8 +71,9 @@ impl<'vm, 'chunk> VM<'vm> {
                 Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
                 Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
                 Byte::Op(OpCode::OpDivide) => self.binary_operation("/"),
+                Byte::Op(OpCode::OpPrint) => self.print(),
                 Byte::Op(OpCode::OpConstant) => {
-                    let constant = &self.chunk.constants.values[constant_index];
+                    let constant = self.chunk.constant_at(constant_index);
                     constant_index += 1;
                     self.stack.push(constant.clone());
                 }
@@ -121,6 +120,10 @@ impl<'vm, 'chunk> VM<'vm> {
         self.stack
             .get(distance)
             .expect("Could not peek into stack.")
+    }
+
+    fn print(&mut self) {
+        println!("{}", self.get_next_constant())
     }
 
     fn runtime_error<T>(&self, ip_index: usize, message: &str) -> RoxResult<T> {
