@@ -1,4 +1,4 @@
-use super::common::OpCode;
+use super::op_code::OpCode;
 use super::traits::*;
 use super::value::{Value, ValueArray};
 

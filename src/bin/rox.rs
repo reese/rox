@@ -5,6 +5,7 @@ use std::env::args;
 use std::path::Path;
 use std::process::exit;
 
+// TODO: Make a more robust CLI with `StructOpt`
 fn main() {
     let arguments: Vec<String> = args().collect();
     if arguments.len() == 1 {

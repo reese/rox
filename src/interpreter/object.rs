@@ -21,6 +21,12 @@ impl Object {
               // concatenate other Objects (e.g. classes)
         }
     }
+
+    pub fn get_string_value(&self) -> &String {
+        match self {
+            Object::String(val) => val,
+        }
+    }
 }
 
 impl std::fmt::Display for Object {

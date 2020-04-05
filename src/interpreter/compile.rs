@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 use std::str;
 
 use super::chunk::{Byte, Chunk};
-use super::common::OpCode;
+use super::op_code::OpCode;
 use super::parse_rule::{ParseOp, ParseRule, RULES};
 use super::parser::Parser;
 use super::precedence::Precedence;
@@ -111,7 +111,14 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn declaration(&mut self) {
-        self.statement();
+        match self.parser.current_token_type() {
+            TokenType::TokenLet => self.variable_declaration(),
+            _ => self.statement(),
+        }
+
+        if self.parser.panic_mode {
+            self.synchronize();
+        }
     }
 
     fn emit_byte(&mut self, byte: Byte) {
@@ -180,9 +187,31 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn statement(&mut self) {
-        match self.parser.current_token_type() {
+        let current_token = self.parser.current_token_type();
+        self.advance();
+        match current_token {
             TokenType::TokenPrint => self.print_statement(),
-            _ => self.expression(),
+            _ => self.expression_statement(),
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.parser.panic_mode = false;
+        while self.parser.is_end_of_file() {
+            match self.parser.current_token_type() {
+                TokenType::TokenClass
+                | TokenType::TokenFn
+                | TokenType::TokenLet
+                | TokenType::TokenFor
+                | TokenType::TokenIf
+                | TokenType::TokenWhile
+                | TokenType::TokenPrint
+                | TokenType::TokenReturn => {
+                    return;
+                }
+                _ => {}
+            }
+            self.advance();
         }
     }
 
@@ -235,6 +264,7 @@ impl<'compiler> Compiler<'compiler> {
             ParseOp::Noop => {}
             ParseOp::String => self.string(),
             ParseOp::Unary => self.unary(),
+            ParseOp::Variable => self.get_variable(),
         }
     }
 
@@ -272,10 +302,62 @@ impl<'compiler> Compiler<'compiler> {
         self.emit_constant(val)
     }
 
-    fn print_statement(&mut self) {
-        self.advance();
+    fn get_variable(&mut self) {
+        let previous = self.parser.previous.clone();
+        self.named_variable(previous);
+    }
+
+    fn expression_statement(&mut self) {
         self.expression();
-        self.consume(TokenType::TokenSemicolon, "Expected ';' after value");
+        self.consume_semicolon();
+        self.emit_byte(Byte::Op(OpCode::OpPop));
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume_semicolon();
         self.emit_byte(Byte::Op(OpCode::OpPrint))
+    }
+
+    fn variable_declaration(&mut self) {
+        let global = self.parse_variable("Expected variable name after `let`");
+        self.consume(
+            TokenType::TokenEqual,
+            "Variables must be initialized at declaration.",
+        );
+        self.expression();
+        self.consume_semicolon();
+
+        self.define_variable(global);
+    }
+
+    fn define_variable(&mut self, variable_constant: u8) {
+        self.emit_bytes(
+            Byte::Constant(variable_constant),
+            Byte::Op(OpCode::OpDefineGlobal),
+        );
+    }
+
+    fn named_variable(&mut self, variable_token: Token) {
+        let identifier = self.identifier_constant(variable_token);
+        self.emit_bytes(
+            Byte::Constant(identifier),
+            Byte::Op(OpCode::OpGetGlobal),
+        )
+    }
+
+    fn parse_variable(&mut self, error_message: &str) -> u8 {
+        self.advance();
+        self.consume(TokenType::TokenIdentifier, error_message);
+        let previous = self.parser.previous.clone();
+        self.identifier_constant(previous)
+    }
+
+    fn identifier_constant(&mut self, token: Token) -> u8 {
+        self.make_constant(Value::create_string(token.text))
+    }
+
+    fn consume_semicolon(&mut self) {
+        self.consume(TokenType::TokenSemicolon, "Expected ';' after value");
     }
 }

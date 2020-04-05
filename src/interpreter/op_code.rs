@@ -15,6 +15,11 @@ pub enum OpCode {
     OpGreaterThan,
     OpEqual,
 
+    OpPop,
+
+    OpDefineGlobal,
+    OpGetGlobal,
+
     OpPrint,
     OpReturn,
 }

@@ -17,4 +17,8 @@ impl Parser<'_> {
     pub fn current_token_type(&self) -> TokenType {
         self.current.token_type
     }
+
+    pub fn is_end_of_file(&self) -> bool {
+        self.check(TokenType::TokenEof)
+    }
 }

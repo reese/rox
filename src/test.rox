@@ -1,3 +1,4 @@
-print 1 + 2;
+let test = 1 + 2;
+print test;
 print "Hello, World!";
 print "Hello, " + "World again!";

@@ -111,6 +111,15 @@ impl Value {
             _ => false,
         }
     }
+
+    pub fn get_string_value(&self) -> &String {
+        match self {
+            Value::Object(obj) => return obj.get_string_value(),
+            _ => panic!(
+                "Attempted to retrieve string value of non-string Value type."
+            ),
+        }
+    }
 }
 
 impl Neg for Value {

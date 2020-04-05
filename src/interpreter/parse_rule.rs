@@ -9,6 +9,7 @@ pub enum ParseOp {
     Number,
     String,
     Unary,
+    Variable,
 }
 
 #[derive(Clone, Copy)]
@@ -115,7 +116,7 @@ pub const RULES: [ParseRule; 39] = [
         precedence: Precedence::PrecedenceEquality,
     }, // Less Equal
     ParseRule {
-        prefix: ParseOp::Noop,
+        prefix: ParseOp::Variable,
         infix: ParseOp::Noop,
         precedence: Precedence::PrecedenceNone,
     }, // Identifier

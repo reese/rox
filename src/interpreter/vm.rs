@@ -1,12 +1,14 @@
 use super::chunk::{Byte, Chunk};
-use super::common::OpCode;
 use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
+use super::op_code::OpCode;
 use super::value::Value;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct VM<'a> {
     pub chunk: &'a mut Chunk,
+    globals: HashMap<String, Value>,
     ips: Vec<Byte>,
     stack: Vec<Value>,
 }
@@ -15,6 +17,7 @@ impl<'vm, 'chunk> VM<'vm> {
     pub fn new(chunk: &'chunk mut Chunk) -> VM {
         VM {
             chunk,
+            globals: HashMap::new(),
             ips: vec![],
             stack: vec![],
         }
@@ -31,15 +34,12 @@ impl<'vm, 'chunk> VM<'vm> {
 
     fn run(&mut self) -> RoxResult<Value> {
         let mut result = None;
-        let mut constant_index = 0;
         self.ips
             .clone()
             .iter()
             .enumerate()
             .for_each(|(index, instruction)| match instruction {
-                Byte::Op(OpCode::OpReturn) => {
-                    result = Some(Ok(Value::Bool(true)));
-                }
+                Byte::Op(OpCode::OpReturn) => {}
                 Byte::Op(OpCode::OpEqual) => self.binary_operation("="),
                 Byte::Op(OpCode::OpGreaterThan) => self.binary_operation(">"),
                 Byte::Op(OpCode::OpLessThan) => self.binary_operation("<"),
@@ -67,23 +67,52 @@ impl<'vm, 'chunk> VM<'vm> {
                 }
                 Byte::Op(OpCode::OpTrue) => self.bool(true),
                 Byte::Op(OpCode::OpFalse) => self.bool(false),
-                Byte::Op(OpCode::OpAdd) => self.binary_operation("+"),
+                Byte::Op(OpCode::OpAdd) => self.binary_operation("+"), // TODO: All of these should be in some kind of enum
                 Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
                 Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
                 Byte::Op(OpCode::OpDivide) => self.binary_operation("/"),
                 Byte::Op(OpCode::OpPrint) => self.print(),
-                Byte::Op(OpCode::OpConstant) => {
-                    let constant = self.chunk.constant_at(constant_index);
-                    constant_index += 1;
+                Byte::Op(OpCode::OpConstant) => {}
+                Byte::Op(OpCode::OpDefineGlobal) => {
+                    let name = self.get_next_constant();
+                    self.globals.insert(
+                        name.get_string_value().clone(),
+                        self.peek(0).clone(),
+                    );
+                    self.stack.pop();
+                }
+                Byte::Op(OpCode::OpGetGlobal) => {
+                    let name = self.get_next_constant();
+                    match self.globals.get(name.get_string_value()) {
+                        Some(value) => self.stack.push(value.clone()),
+                        None => {
+                            result = Some(
+                                self.runtime_error(
+                                    index,
+                                    format!("Undefined variable: {}", name)
+                                        .as_ref(),
+                                ),
+                            );
+                        }
+                    }
+                }
+                Byte::Op(OpCode::OpPop) => {
+                    self.stack.pop();
+                }
+                Byte::Constant(index) => {
+                    let constant = self.chunk.constant_at(*index as usize);
                     self.stack.push(constant.clone());
                 }
-                Byte::Constant(x) => {}
                 byte_code => unreachable!(
                     "Encountered unexpected operation: {:?}",
                     byte_code
                 ),
             });
-        result.unwrap_or(InterpretError::compile_error())
+
+        match result {
+            Some(result) => result,
+            None => Ok(Value::Bool(true)),
+        }
     }
 
     fn binary_operation(&mut self, operation: &str) {
