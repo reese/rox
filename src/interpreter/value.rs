@@ -12,10 +12,8 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn create_string(string: &[u8]) -> Self {
-        let object = Rc::new(Object::String(
-            String::from_utf8(Vec::from(string)).unwrap(),
-        ));
+    pub fn create_string(string: String) -> Self {
+        let object = Rc::new(Object::String(string));
         Value::Object(object)
     }
 
@@ -105,13 +103,6 @@ impl Value {
         }
     }
 
-    pub fn is_object(&self) -> bool {
-        match self {
-            Value::Object(_) => true,
-            _ => false,
-        }
-    }
-
     pub fn get_string_value(&self) -> &String {
         match self {
             Value::Object(obj) => return obj.get_string_value(),
@@ -173,7 +164,8 @@ impl Clone for ValueArray {
 }
 
 impl Push<Value> for ValueArray {
-    fn push(&mut self, value: Value) {
-        self.values.push(value)
+    fn push(&mut self, value: Value) -> u8 {
+        self.values.push(value);
+        (self.values.len() - 1) as u8
     }
 }

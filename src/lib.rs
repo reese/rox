@@ -5,6 +5,8 @@
 
 #[macro_use]
 extern crate text_io;
+#[macro_use]
+extern crate lalrpop_util;
 
 mod interpreter;
 
@@ -27,8 +29,8 @@ use std::process::exit;
 /// to have POSIX compliant error codes, or at least
 /// some consistent error code system.
 pub fn run_file(path: &Path) -> std::io::Result<()> {
-    let source = fs::read(path)?;
-    let result = interpret(source);
+    let source = fs::read_to_string(path)?;
+    let result = interpret(&source);
     match result {
         Err(InterpretError { error_type, .. })
             if error_type == InterpretErrorType::InterpretCompileError =>
@@ -52,8 +54,8 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
 /// (Read-Evaluate-Print-Loop), taking in
 /// some input string, running it through the interpreter,
 /// and returning the value. Note that this REPL doesn't currently
-/// maintain any sort of state (since we don't support variable) assignment
-/// yet, so this is really just a glorified calculator at the moment.
+/// maintain any sort of state (since we don't support variable assignment
+/// yet), so this is really just a glorified calculator at the moment.
 pub fn repl() {
     loop {
         print!("\nrox > ");
@@ -66,11 +68,11 @@ pub fn repl() {
             break;
         }
 
-        interpret(input_string.as_bytes().to_vec()).unwrap();
+        interpret(&input_string).unwrap();
     }
 }
 
-fn interpret(input: Vec<u8>) -> RoxResult<Value> {
+fn interpret(input: &String) -> RoxResult<Value> {
     let chunk = &mut Chunk::new();
     VM::new(chunk).interpret(input)
 }

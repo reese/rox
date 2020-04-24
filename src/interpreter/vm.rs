@@ -23,9 +23,9 @@ impl<'vm, 'chunk> VM<'vm> {
         }
     }
 
-    pub fn interpret(&mut self, source: Vec<u8>) -> RoxResult<Value> {
-        let mut compiler = Compiler::new(&source, self.chunk);
-        if !compiler.compile() {
+    pub fn interpret(&mut self, source: &String) -> RoxResult<Value> {
+        let mut compiler = Compiler::new(self.chunk);
+        if compiler.compile(source).is_err() {
             return InterpretError::compile_error();
         }
         self.ips = self.chunk.codes.to_vec();
@@ -37,16 +37,14 @@ impl<'vm, 'chunk> VM<'vm> {
         self.ips
             .clone()
             .iter()
-            .enumerate()
-            .for_each(|(index, instruction)| match instruction {
-                Byte::Op(OpCode::OpReturn) => {}
-                Byte::Op(OpCode::OpEqual) => self.binary_operation("="),
-                Byte::Op(OpCode::OpGreaterThan) => self.binary_operation(">"),
-                Byte::Op(OpCode::OpLessThan) => self.binary_operation("<"),
-                Byte::Op(OpCode::OpNegate) => {
+            .for_each(|instruction| match instruction {
+                Byte::Op(OpCode::Return) => {}
+                Byte::Op(OpCode::Equal) => self.binary_operation("="),
+                Byte::Op(OpCode::GreaterThan) => self.binary_operation(">"),
+                Byte::Op(OpCode::LessThan) => self.binary_operation("<"),
+                Byte::Op(OpCode::Negate) => {
                     if !self.peek(0).is_number() {
                         result = Some(self.runtime_error(
-                            index,
                             "Could not negate non-number type",
                         ))
                     } else {
@@ -54,10 +52,9 @@ impl<'vm, 'chunk> VM<'vm> {
                         self.stack.push(-next_constant)
                     }
                 }
-                Byte::Op(OpCode::OpNot) => {
+                Byte::Op(OpCode::Not) => {
                     if !self.peek(0).is_bool() {
                         result = Some(self.runtime_error(
-                            index,
                             "Could not negate non-bool type.",
                         ))
                     } else {
@@ -65,15 +62,15 @@ impl<'vm, 'chunk> VM<'vm> {
                         self.stack.push(!next_constant);
                     }
                 }
-                Byte::Op(OpCode::OpTrue) => self.bool(true),
-                Byte::Op(OpCode::OpFalse) => self.bool(false),
-                Byte::Op(OpCode::OpAdd) => self.binary_operation("+"), // TODO: All of these should be in some kind of enum
-                Byte::Op(OpCode::OpSubtract) => self.binary_operation("-"),
-                Byte::Op(OpCode::OpMultiply) => self.binary_operation("*"),
-                Byte::Op(OpCode::OpDivide) => self.binary_operation("/"),
-                Byte::Op(OpCode::OpPrint) => self.print(),
-                Byte::Op(OpCode::OpConstant) => {}
-                Byte::Op(OpCode::OpDefineGlobal) => {
+                Byte::Op(OpCode::True) => self.bool(true),
+                Byte::Op(OpCode::False) => self.bool(false),
+                Byte::Op(OpCode::Add) => self.binary_operation("+"), // TODO: All of these should be in some kind of enum
+                Byte::Op(OpCode::Subtract) => self.binary_operation("-"),
+                Byte::Op(OpCode::Multiply) => self.binary_operation("*"),
+                Byte::Op(OpCode::Divide) => self.binary_operation("/"),
+                Byte::Op(OpCode::Print) => self.print(),
+                Byte::Op(OpCode::Constant) => {}
+                Byte::Op(OpCode::DefineGlobal) => {
                     let name = self.get_next_constant();
                     self.globals.insert(
                         name.get_string_value().clone(),
@@ -81,14 +78,13 @@ impl<'vm, 'chunk> VM<'vm> {
                     );
                     self.stack.pop();
                 }
-                Byte::Op(OpCode::OpGetGlobal) => {
+                Byte::Op(OpCode::GetGlobal) => {
                     let name = self.get_next_constant();
                     match self.globals.get(name.get_string_value()) {
                         Some(value) => self.stack.push(value.clone()),
                         None => {
                             result = Some(
                                 self.runtime_error(
-                                    index,
                                     format!("Undefined variable: {}", name)
                                         .as_ref(),
                                 ),
@@ -96,7 +92,7 @@ impl<'vm, 'chunk> VM<'vm> {
                         }
                     }
                 }
-                Byte::Op(OpCode::OpPop) => {
+                Byte::Op(OpCode::Pop) => {
                     self.stack.pop();
                 }
                 Byte::Constant(index) => {
@@ -155,14 +151,7 @@ impl<'vm, 'chunk> VM<'vm> {
         println!("{}", self.get_next_constant())
     }
 
-    fn runtime_error<T>(&self, ip_index: usize, message: &str) -> RoxResult<T> {
-        println!(
-            "{}",
-            format!(
-                "Your line number might be {}",
-                self.chunk.lines[ip_index] - 1
-            )
-        );
+    fn runtime_error<T>(&self, message: &str) -> RoxResult<T> {
         InterpretError::runtime_error(message)
     }
 }

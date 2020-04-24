@@ -1,11 +1,7 @@
 use super::op_code::OpCode;
-use super::traits::*;
+use super::traits::Push;
 use super::value::{Value, ValueArray};
 
-// TODO: Why do these both exist?
-// I think constants can be removed
-// so that we only have op codes, because
-// presumably constants will be on the stack
 #[derive(Clone, Debug)]
 pub enum Byte {
     Op(OpCode),
@@ -16,7 +12,6 @@ pub enum Byte {
 pub struct Chunk {
     pub codes: Vec<Byte>,
     pub constants: ValueArray,
-    pub lines: Vec<i32>,
 }
 
 impl Chunk {
@@ -24,7 +19,6 @@ impl Chunk {
         Chunk {
             codes: vec![],
             constants: ValueArray::new(),
-            lines: vec![],
         }
     }
 
@@ -38,23 +32,20 @@ impl Clone for Chunk {
         Chunk {
             codes: self.codes.clone(),
             constants: self.constants.clone(),
-            lines: self.lines.clone(),
         }
     }
 }
 
-impl PushLine<Byte> for Chunk {
-    fn push_line(&mut self, byte: Byte, line: i32) -> u8 {
+impl Push<Byte> for Chunk {
+    fn push(&mut self, byte: Byte) -> u8 {
         self.codes.push(byte);
-        self.lines.push(line);
         (self.codes.len() - 1) as u8
     }
 }
 
-impl PushLine<Value> for Chunk {
-    fn push_line(&mut self, byte: Value, line: i32) -> u8 {
+impl Push<Value> for Chunk {
+    fn push(&mut self, byte: Value) -> u8 {
         self.constants.push(byte);
-        self.lines.push(line);
         (self.constants.values.len() - 1) as u8
     }
 }

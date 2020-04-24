@@ -1,0 +1,73 @@
+use crate::interpreter::{Declaration, Expression, Operation, Statement};
+use std::str::FromStr;
+use lalrpop_util::ErrorRecovery;
+
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
+
+pub Program: Vec<Box<Declaration>> = {
+    <(<Declaration>)*>
+}
+
+pub Declaration: Box<Declaration> = {
+    <Statement> ";" => Box::new(Declaration::Statement(<>)),
+    "let" <Identifier> "=" <Expression> ";" => Box::new(Declaration::Variable(<>)),
+}
+
+Statement: Box<Statement> = {
+    <Expression> => Box::new(Statement::Expression(<>)),
+    "print" <Expression> => Box::new(Statement::Print(<>)),
+    "return" <e:Expression?> => match e {
+        None => Box::new(Statement::Return(None)),
+        Some(e) => Box::new(Statement::Return(Some(e))),
+    }
+};
+
+Expression: Box<Expression> = {
+    Boolean => Box::new(Expression::Boolean(<>)),
+    Expression ExpressionOp Factor => Box::new(Expression::Operation(<>)),
+    Factor,
+    ! => {
+        errors.push(<>);
+        Box::new(Expression::ParseError)
+    }
+};
+
+Factor: Box<Expression> = {
+    Factor FactorOp Term => Box::new(Expression::Operation(<>)),
+    Term,
+};
+
+FactorOp: Operation = {
+    "*" => Operation::Multiply,
+    "/" => Operation::Divide,
+    "%" => Operation::Modulo,
+};
+
+ExpressionOp: Operation = {
+    "+" => Operation::Add,
+    "-" => Operation::Subtract,
+};
+
+Term: Box<Expression> = {
+    Num => Box::new(Expression::Number(<>)),
+    Identifier => Box::new(Expression::Identifier(<>)),
+    String => Box::new(Expression::String(<>)),
+    "(" <Expression> ")"
+};
+
+Boolean: bool = {
+    "true" => true,
+    "false" => false,
+}
+
+Identifier: String = {
+    r"[a-zA-Z_]([a-zA-Z0-9_])*" => String::from(<>)
+}
+
+Num: f64 = {
+    r"[0-9]+(\.)?([0-9]+)?" => f64::from_str(<>).unwrap()
+};
+
+String: String = {
+    r#""[^"]*""# => String::from(<>)
+}

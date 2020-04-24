@@ -12,7 +12,12 @@ path = "src/lib.rs"
 name = "rox"
 path = "src/bin/rox.rs"
 
+[build-dependencies]
+lalrpop = { version = "0.18.1", features = ["lexer"] }
+
 [dependencies]
+lalrpop-util = "0.18.1"
+regex = "1"
 text_io = "0.1.7"
 num-traits = "*"
 num-derive = "*"

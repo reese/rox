@@ -1,25 +1,26 @@
 #[derive(Copy, Clone, Debug)]
 pub enum OpCode {
-    OpConstant,
-    OpTrue,
-    OpFalse,
-    OpNot,
+    Constant,
+    True,
+    False,
+    Not,
 
-    OpNegate,
-    OpAdd,
-    OpSubtract,
-    OpMultiply,
-    OpDivide,
+    Negate,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
 
-    OpLessThan,
-    OpGreaterThan,
-    OpEqual,
+    LessThan,
+    GreaterThan,
+    Equal,
 
-    OpPop,
+    Pop,
 
-    OpDefineGlobal,
-    OpGetGlobal,
+    DefineGlobal,
+    GetGlobal,
 
-    OpPrint,
-    OpReturn,
+    Print,
+    Return,
 }
