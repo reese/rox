@@ -5,7 +5,7 @@ pub enum Expression {
     Number(f64),
     Operation(Box<Expression>, Operation, Box<Expression>),
     String(String),
-    ParseError
+    ParseError,
 }
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub enum Operation {
     Subtract,
     Multiply,
     Divide,
-    Modulo
+    Modulo,
 }
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ pub enum Statement {
     Print(Box<Expression>),
     Return(Option<Box<Expression>>),
     While(Box<Expression>, Box<Statement>),
-    Block(Box<Declaration>)
+    Block(Box<Declaration>),
 }
 
 #[derive(Debug)]

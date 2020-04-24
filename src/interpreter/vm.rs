@@ -44,9 +44,10 @@ impl<'vm, 'chunk> VM<'vm> {
                 Byte::Op(OpCode::LessThan) => self.binary_operation("<"),
                 Byte::Op(OpCode::Negate) => {
                     if !self.peek(0).is_number() {
-                        result = Some(self.runtime_error(
-                            "Could not negate non-number type",
-                        ))
+                        result =
+                            Some(self.runtime_error(
+                                "Could not negate non-number type",
+                            ))
                     } else {
                         let next_constant = self.get_next_constant();
                         self.stack.push(-next_constant)
@@ -54,9 +55,10 @@ impl<'vm, 'chunk> VM<'vm> {
                 }
                 Byte::Op(OpCode::Not) => {
                     if !self.peek(0).is_bool() {
-                        result = Some(self.runtime_error(
-                            "Could not negate non-bool type.",
-                        ))
+                        result =
+                            Some(self.runtime_error(
+                                "Could not negate non-bool type.",
+                            ))
                     } else {
                         let next_constant = self.get_next_constant();
                         self.stack.push(!next_constant);

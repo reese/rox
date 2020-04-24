@@ -3,13 +3,17 @@ use std::str;
 use super::chunk::{Byte, Chunk};
 use super::op_code::OpCode;
 use super::value::Value;
-use lalrpop_util::ErrorRecovery;
-use crate::interpreter::{Declaration, RoxResult, InterpretError, Statement, Expression, Push, Operation};
+use crate::interpreter::{
+    Declaration, Expression, InterpretError, Operation, Push, RoxResult,
+    Statement,
+};
 use lalrpop_util::lexer::Token;
+use lalrpop_util::ErrorRecovery;
 
 lalrpop_mod!(pub rox_parser);
 
-type LalrpopParseError<'input> = ErrorRecovery<usize, Token<'input>, &'static str>;
+type LalrpopParseError<'input> =
+    ErrorRecovery<usize, Token<'input>, &'static str>;
 
 #[derive(Debug)]
 pub struct Compiler<'a> {
@@ -23,36 +27,52 @@ impl<'compiler> Compiler<'compiler> {
         }
     }
 
-    pub fn compile(&'compiler mut self, source: &'compiler String) -> RoxResult<()> {
+    pub fn compile(
+        &'compiler mut self,
+        source: &'compiler String,
+    ) -> RoxResult<()> {
         match self.parse_source_code(source) {
             Err(errors) => {
                 println!("{:?}", errors);
                 InterpretError::compile_error()
-            }, // TODO: Properly convert errors
-            Ok(declarations) => self.compile_declarations(declarations)
+            } // TODO: Properly convert errors
+            Ok(declarations) => self.compile_declarations(declarations),
         }
     }
 
-    fn parse_source_code(&self, source: &'compiler String) -> Result<Vec<Box<Declaration>>, Vec<LalrpopParseError>> {
-        let mut errors  = Vec::new();
-        let declarations: Vec<Box<Declaration>> = rox_parser::ProgramParser::new()
-            .parse(&mut errors, source)
-            .unwrap();
+    fn parse_source_code(
+        &self,
+        source: &'compiler String,
+    ) -> Result<Vec<Box<Declaration>>, Vec<LalrpopParseError>> {
+        let mut errors = Vec::new();
+        let declarations: Vec<Box<Declaration>> =
+            rox_parser::ProgramParser::new()
+                .parse(&mut errors, source)
+                .unwrap();
         match errors.clone() {
             empty_vec if empty_vec.is_empty() => Ok(declarations),
-            error_vec => Err(error_vec)
+            error_vec => Err(error_vec),
         }
     }
 
-    fn compile_declarations(&mut self, declarations: Vec<Box<Declaration>>) -> RoxResult<()> {
-        declarations.iter().for_each(|declaration|
+    fn compile_declarations(
+        &mut self,
+        declarations: Vec<Box<Declaration>>,
+    ) -> RoxResult<()> {
+        declarations.iter().for_each(|declaration| {
             match declaration.as_ref() {
                 Declaration::Statement(statement) => self.statement(&statement),
-                Declaration::Variable(identifier, expression) => self.variable_declaration(identifier, expression),
-                Declaration::Function( .. ) => panic!("Sorry, I haven't implemented functions yet."),
-                Declaration::Class( .. ) => panic!("Sorry, I haven't implemented classes yet.")
+                Declaration::Variable(identifier, expression) => {
+                    self.variable_declaration(identifier, expression)
+                }
+                Declaration::Function(..) => {
+                    panic!("Sorry, I haven't implemented functions yet.")
+                }
+                Declaration::Class(..) => {
+                    panic!("Sorry, I haven't implemented classes yet.")
+                }
             }
-        );
+        });
         Ok(())
     }
 
@@ -82,10 +102,16 @@ impl<'compiler> Compiler<'compiler> {
         match expression {
             Expression::Boolean(boolean) => self.boolean(boolean),
             Expression::Number(number) => self.number(number),
-            Expression::Identifier(identifier) => self.retrieve_variable_value(identifier),
+            Expression::Identifier(identifier) => {
+                self.retrieve_variable_value(identifier)
+            }
             Expression::String(string) => self.string(string),
-            Expression::Operation(left, operation, right) => self.execute_operation(left, operation, right),
-            Expression::ParseError => panic!("Somehow the parse errors got through to execution.")
+            Expression::Operation(left, operation, right) => {
+                self.execute_operation(left, operation, right)
+            }
+            Expression::ParseError => {
+                panic!("Somehow the parse errors got through to execution.")
+            }
         }
     }
 
@@ -101,12 +127,13 @@ impl<'compiler> Compiler<'compiler> {
                     }
                 }
                 self.emit_byte(Byte::Op(OpCode::Return))
-            },
-            Statement::While( .. )
+            }
+            Statement::While(..)
             | Statement::For
             | Statement::If
-            | Statement::While( .. )
-            | Statement::Block( .. ) => panic!("This statement type has not yet been implemented")
+            | Statement::Block(..) => {
+                panic!("This statement type has not yet been implemented")
+            }
         }
     }
 
@@ -124,14 +151,19 @@ impl<'compiler> Compiler<'compiler> {
         self.emit_constant(value);
     }
 
-    fn execute_operation(&mut self, left: &Box<Expression>, operation: &Operation, right: &Box<Expression>) {
+    fn execute_operation(
+        &mut self,
+        left: &Box<Expression>,
+        operation: &Operation,
+        right: &Box<Expression>,
+    ) {
         // The order of these is important so that they are popped off the stack in order
         self.expression(right);
         self.expression(left);
         match operation {
             Operation::Add => self.emit_byte(Byte::Op(OpCode::Add)),
-            Operation::Subtract=> self.emit_byte(Byte::Op(OpCode::Subtract)),
-            Operation::Multiply=> self.emit_byte(Byte::Op(OpCode::Multiply)),
+            Operation::Subtract => self.emit_byte(Byte::Op(OpCode::Subtract)),
+            Operation::Multiply => self.emit_byte(Byte::Op(OpCode::Multiply)),
             Operation::Divide => self.emit_byte(Byte::Op(OpCode::Divide)),
             Operation::Modulo => self.emit_byte(Byte::Op(OpCode::Modulo)),
         }
@@ -147,7 +179,11 @@ impl<'compiler> Compiler<'compiler> {
         self.emit_byte(Byte::Op(OpCode::Print))
     }
 
-    fn variable_declaration(&mut self, identifier: &String, expression: &Box<Expression>) {
+    fn variable_declaration(
+        &mut self,
+        identifier: &String,
+        expression: &Box<Expression>,
+    ) {
         self.expression(expression);
         let variable_constant = self.identifier_constant(identifier);
         self.define_variable(variable_constant);

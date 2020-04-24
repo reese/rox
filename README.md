@@ -11,14 +11,14 @@ You can start the REPL using `cargo run`, or you can run an individual file usin
 
 ## Difference between Lox and Rox
 
-Rox is based off of the Lox language introduced in Bob Nystrom's book "Crafting Interpreters."
-However, I intend to change some of the design decisions bade in the book.
-
-I intend to keep many of the general syntactic decisions made in the book, but I intend to make the language statically typed.
-Previously, I intended to keep the language dynamic while trying to avoid a certain class of errors by removing the `nil` keyword, but in retrospect, I've found that a sound type system is much more productive in the long term, especially with a good type inference system.
+Rox is originally based off of the Lox language introduced in Bob Nystrom's book "Crafting Interpreters."
+However, as I've continued through this book, my implementation and design decisions have increasingly split from the original Lox language.
+Lox in many ways follows the lead of JavaScript and Python, but in my personal experience with these languages, I've found them much more enjoyable when combined with static analysis tools, such as TypeScript and MyPy.
+Having a language with that marries the flexibility of high-level languages while also preventing a whole class of bugs with a robust type system.
+I hope that Rox will join the familiarity and readability of C-style syntax with the strong types of functional-style languages like OCaml, Haskell, and Rust.
 
 ## Future Additions
 
-Once the major parts of the compiler are completed, it could be interesting to replace this hand-made VM with LLVM.
-Given that we already compile to a fairly standard intermediate representation (and the language is fairly small as-is), this should provide a lot of benefits from the LLVM optimization passes.
-Rust bindings for LLVM are pretty sparse, but [Inkwell](https://github.com/TheDan64/inkwell) looks like a good option for Rust-y bindings without excessive use of `unsafe`.
+One possible future alternative for this VM would be to compile directly to WebAssembly.
+There are several reasons why this may be an interesting alternative, but in brief, it would make cross platform compilation better (using something like WASI), as well as make it easier to write for desktop, mobile, web and server development.
+Essentially, WASM is an interesting development that looks like it may eventually serve as a recognized cross-platform standard.
