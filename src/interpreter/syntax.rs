@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub enum Expression {
+    Assignment(String, Box<Expression>),
     Boolean(bool),
     Identifier(String),
     Number(f64),
@@ -10,6 +11,12 @@ pub enum Expression {
 
 #[derive(Debug)]
 pub enum Operation {
+    And,
+    Or,
+
+    Equals,
+    NotEquals,
+
     Add,
     Subtract,
     Multiply,

@@ -1,5 +1,11 @@
 #[derive(Copy, Clone, Debug)]
 pub enum OpCode {
+    And,
+    Or,
+
+    Equals,
+    NotEquals,
+
     Constant,
     True,
     False,
@@ -20,6 +26,7 @@ pub enum OpCode {
 
     DefineGlobal,
     GetGlobal,
+    SetGlobal,
 
     Print,
     Return,

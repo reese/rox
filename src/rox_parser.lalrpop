@@ -14,13 +14,22 @@ pub Declaration: Box<Declaration> = {
 }
 
 Statement: Box<Statement> = {
-    <Expression> => Box::new(Statement::Expression(<>)),
-    "print" <Expression> => Box::new(Statement::Print(<>)),
-    "return" <e:Expression?> => match e {
+    <TopExpression> => Box::new(Statement::Expression(<>)),
+    "print" <TopExpression> => Box::new(Statement::Print(<>)),
+    "return" <e:TopExpression?> => match e {
         None => Box::new(Statement::Return(None)),
         Some(e) => Box::new(Statement::Return(Some(e))),
     }
 };
+
+TopExpression: Box<Expression> = {
+    <Assignment>
+}
+
+Assignment: Box<Expression> = {
+    <Identifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
+    <Expression>
+}
 
 Expression: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),

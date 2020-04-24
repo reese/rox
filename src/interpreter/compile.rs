@@ -100,6 +100,9 @@ impl<'compiler> Compiler<'compiler> {
 
     fn expression(&mut self, expression: &Expression) {
         match expression {
+            Expression::Assignment(identifier, expression) => {
+                self.assignment(identifier, expression)
+            }
             Expression::Boolean(boolean) => self.boolean(boolean),
             Expression::Number(number) => self.number(number),
             Expression::Identifier(identifier) => {
@@ -161,12 +164,29 @@ impl<'compiler> Compiler<'compiler> {
         self.expression(right);
         self.expression(left);
         match operation {
+            Operation::And => self.emit_byte(Byte::Op(OpCode::And)),
+            Operation::Or => self.emit_byte(Byte::Op(OpCode::Or)),
+            Operation::Equals => self.emit_byte(Byte::Op(OpCode::Equal)),
+            Operation::NotEquals => self.emit_byte(Byte::Op(OpCode::NotEquals)),
             Operation::Add => self.emit_byte(Byte::Op(OpCode::Add)),
             Operation::Subtract => self.emit_byte(Byte::Op(OpCode::Subtract)),
             Operation::Multiply => self.emit_byte(Byte::Op(OpCode::Multiply)),
             Operation::Divide => self.emit_byte(Byte::Op(OpCode::Divide)),
             Operation::Modulo => self.emit_byte(Byte::Op(OpCode::Modulo)),
         }
+    }
+
+    fn assignment(
+        &mut self,
+        identifier: &String,
+        expression: &Box<Expression>,
+    ) {
+        let identifier_constant = self.identifier_constant(identifier);
+        self.expression(expression);
+        self.emit_bytes(
+            Byte::Constant(identifier_constant),
+            Byte::Op(OpCode::SetGlobal),
+        )
     }
 
     fn string(&mut self, string: &String) {

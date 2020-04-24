@@ -94,6 +94,13 @@ impl<'vm, 'chunk> VM<'vm> {
                         }
                     }
                 }
+                Byte::Op(OpCode::SetGlobal) => {
+                    let name = self.get_next_constant();
+                    let value = self.get_next_constant();
+                    self.globals
+                        .insert(name.get_string_value().clone(), value)
+                        .unwrap();
+                }
                 Byte::Op(OpCode::Pop) => {
                     self.stack.pop();
                 }
