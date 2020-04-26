@@ -59,7 +59,7 @@ impl Value {
     pub fn equals(self, other: Self) -> RoxResult<Value> {
         match (self, other) {
             (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Bool(first == second))
+                Ok(Value::Bool(first.eq(&second)))
             }
             (Value::Bool(first), Value::Bool(second)) => {
                 Ok(Value::Bool(first == second))
@@ -91,7 +91,7 @@ impl Value {
 
     pub fn get_string_value(&self) -> &String {
         match self {
-            Value::Object(obj) => return obj.get_string_value(),
+            Value::Object(obj) => obj.get_string_value(),
             _ => panic!(
                 "Attempted to retrieve string value of non-string Value type."
             ),
