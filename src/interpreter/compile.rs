@@ -68,8 +68,8 @@ impl<'compiler> Compiler<'compiler> {
                 Declaration::Function(..) => {
                     panic!("Sorry, I haven't implemented functions yet.")
                 }
-                Declaration::Class(..) => {
-                    panic!("Sorry, I haven't implemented classes yet.")
+                Declaration::Record(..) => {
+                    panic!("Sorry, I haven't implemented records yet.")
                 }
             }
         });

@@ -9,7 +9,6 @@ use std::collections::HashMap;
 pub struct VM<'a> {
     pub chunk: &'a mut Chunk,
     globals: HashMap<String, Value>,
-    ips: Vec<Byte>,
     stack: Vec<Value>,
 }
 
@@ -18,7 +17,6 @@ impl<'vm, 'chunk> VM<'vm> {
         VM {
             chunk,
             globals: HashMap::new(),
-            ips: vec![],
             stack: vec![],
         }
     }
@@ -28,13 +26,13 @@ impl<'vm, 'chunk> VM<'vm> {
         if compiler.compile(source).is_err() {
             return InterpretError::compile_error();
         }
-        self.ips = self.chunk.codes.to_vec();
-        self.run()
+        let ips = self.chunk.codes.to_vec();
+        self.run(&ips)
     }
 
-    fn run(&mut self) -> RoxResult<Value> {
+    fn run(&mut self, instructions: &Vec<Byte>) -> RoxResult<Value> {
         let mut result = None;
-        self.ips
+        instructions
             .clone()
             .iter()
             .for_each(|instruction| match instruction {

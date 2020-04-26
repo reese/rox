@@ -28,6 +28,9 @@ pub enum Operation {
 pub struct Function;
 
 #[derive(Debug)]
+pub struct Field;
+
+#[derive(Debug)]
 pub enum Statement {
     Expression(Box<Expression>),
     For,
@@ -40,8 +43,8 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub enum Declaration {
-    Class(String, Option<String>),
-    Variable(String, Box<Expression>),
     Function(Function),
+    Record(Vec<Field>),
     Statement(Box<Statement>),
+    Variable(String, Box<Expression>),
 }
