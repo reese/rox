@@ -1,6 +1,7 @@
 [package]
 name = "rox"
 version = "0.0.0"
+license = "MIT AND Apache-2.0"
 description = "The Rox Programming Language"
 authors = ["Reese Williams <reese@reesew.io>"]
 edition = "2018"
