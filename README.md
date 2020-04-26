@@ -16,9 +16,3 @@ However, as I've continued through this book, my implementation and design decis
 Lox in many ways follows the lead of JavaScript and Python, but in my personal experience with these languages, I've found them much more enjoyable when combined with static analysis tools, such as TypeScript and MyPy.
 Having a language with that marries the flexibility of high-level languages while also preventing a whole class of bugs with a robust type system.
 I hope that Rox will join the familiarity and readability of C-style syntax with the strong types of functional-style languages like OCaml, Haskell, and Rust.
-
-## Future Additions
-
-One possible future alternative for this VM would be to compile directly to WebAssembly.
-There are several reasons why this may be an interesting alternative, but in brief, it would make cross platform compilation better (using something like WASI), as well as make it easier to write for desktop, mobile, web and server development.
-Essentially, WASM is an interesting development that looks like it may eventually serve as a recognized cross-platform standard.

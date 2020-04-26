@@ -10,8 +10,6 @@
 //! series, "Crafting Interpreters."
 
 #[macro_use]
-extern crate text_io;
-#[macro_use]
 extern crate lalrpop_util;
 
 mod interpreter;
@@ -54,28 +52,6 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
             exit(0)
         }
     };
-}
-
-/// `repl` starts and evaluates in a REPL
-/// (Read-Evaluate-Print-Loop), taking in
-/// some input string, running it through the interpreter,
-/// and returning the value. Note that this REPL doesn't currently
-/// maintain any sort of state (since we don't support variable assignment
-/// yet), so this is really just a glorified calculator at the moment.
-pub fn repl() {
-    loop {
-        print!("\nrox > ");
-        io::stdout().flush().unwrap();
-
-        let input_string: String = read!();
-        println!("{:?}", input_string);
-        if input_string.eq("exit()") {
-            println!("exit");
-            break;
-        }
-
-        interpret(&input_string).unwrap();
-    }
 }
 
 fn interpret(input: &String) -> RoxResult<Value> {
