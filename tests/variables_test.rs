@@ -2,8 +2,6 @@
 extern crate rox;
 extern crate test;
 
-use std::io::Error;
-
 fn run_variable_compilation() -> std::io::Result<()> {
     rox::run_file("tests/fixtures/variables.rox".as_ref())
 }

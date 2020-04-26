@@ -1,4 +1,10 @@
 #![deny(missing_docs)]
+#![doc(
+    html_logo_url = "https://github.com/reese/rox/raw/master/assets/geodude.png"
+)]
+#![doc(
+    html_favicon_url = "https://github.com/reese/rox/raw/master/assets/favicon.png"
+)]
 //! # Rox
 //! `Rox` is based on the `Lox` language implemented in Bob Nystrom's
 //! series, "Crafting Interpreters."

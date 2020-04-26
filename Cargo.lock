@@ -563,7 +563,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "rox"
-version = "0.0.1"
+version = "0.0.0"
 dependencies = [
  "im 14.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lalrpop 0.18.1 (registry+https://github.com/rust-lang/crates.io-index)",
