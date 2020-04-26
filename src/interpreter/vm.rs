@@ -3,7 +3,7 @@ use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
 use super::op_code::OpCode;
 use super::value::Value;
-use crate::interpreter::Stack;
+use crate::interpreter::{Operation, Stack};
 use im::HashMap;
 
 type Environment = HashMap<String, Value>;
@@ -28,7 +28,7 @@ impl<'vm, 'chunk> VM<'vm> {
         }
     }
 
-    pub fn interpret(&mut self, source: &String) -> RoxResult<Value> {
+    pub fn interpret(&mut self, source: &str) -> RoxResult<Value> {
         let mut compiler = Compiler::new(self.chunk);
         if compiler.compile(source).is_err() {
             return InterpretError::compile_error();
@@ -37,16 +37,21 @@ impl<'vm, 'chunk> VM<'vm> {
         self.run(&ips)
     }
 
-    fn run(&mut self, instructions: &Vec<Byte>) -> RoxResult<Value> {
+    fn run(&mut self, instructions: &[Byte]) -> RoxResult<Value> {
         let mut result = None;
         instructions
-            .clone()
             .iter()
             .for_each(|instruction| match instruction {
                 Byte::Op(OpCode::Return) => {}
-                Byte::Op(OpCode::Equal) => self.binary_operation("="),
-                Byte::Op(OpCode::GreaterThan) => self.binary_operation(">"),
-                Byte::Op(OpCode::LessThan) => self.binary_operation("<"),
+                Byte::Op(OpCode::Equal) => {
+                    self.binary_operation(Operation::Equals)
+                }
+                Byte::Op(OpCode::GreaterThan) => {
+                    self.binary_operation(Operation::GreaterThan)
+                }
+                Byte::Op(OpCode::LessThan) => {
+                    self.binary_operation(Operation::LessThan)
+                }
                 Byte::Op(OpCode::Negate) => {
                     if !self.peek_next().is_number() {
                         result =
@@ -71,10 +76,16 @@ impl<'vm, 'chunk> VM<'vm> {
                 }
                 Byte::Op(OpCode::True) => self.bool(true),
                 Byte::Op(OpCode::False) => self.bool(false),
-                Byte::Op(OpCode::Add) => self.binary_operation("+"), // TODO: All of these should be in some kind of enum
-                Byte::Op(OpCode::Subtract) => self.binary_operation("-"),
-                Byte::Op(OpCode::Multiply) => self.binary_operation("*"),
-                Byte::Op(OpCode::Divide) => self.binary_operation("/"),
+                Byte::Op(OpCode::Add) => self.binary_operation(Operation::Add),
+                Byte::Op(OpCode::Subtract) => {
+                    self.binary_operation(Operation::Subtract)
+                }
+                Byte::Op(OpCode::Multiply) => {
+                    self.binary_operation(Operation::Multiply)
+                }
+                Byte::Op(OpCode::Divide) => {
+                    self.binary_operation(Operation::Divide)
+                }
                 Byte::Op(OpCode::Print) => self.print(),
                 Byte::Op(OpCode::Constant) => {}
                 Byte::Op(OpCode::DefineVariable) => {
@@ -128,17 +139,17 @@ impl<'vm, 'chunk> VM<'vm> {
         }
     }
 
-    fn binary_operation(&mut self, operation: &str) {
+    fn binary_operation(&mut self, operation: Operation) {
         let first = self.get_next_constant();
         let second = self.get_next_constant();
         let result = match operation {
-            "+" => second.add(first),
-            "-" => second.subtract(first),
-            "*" => second.multiply(first),
-            "/" => second.divide(first),
-            "=" => second.equals(first),
-            ">" => second.greater_than(first),
-            "<" => second.less_than(first),
+            Operation::Add => second.add(first),
+            Operation::Subtract => second.subtract(first),
+            Operation::Multiply => second.multiply(first),
+            Operation::Divide => second.divide(first),
+            Operation::Equals => second.equals(first),
+            Operation::GreaterThan => second.greater_than(first),
+            Operation::LessThan => second.less_than(first),
             _ => panic!("Unknown binary operation attempted."),
         };
         match result {

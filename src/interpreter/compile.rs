@@ -29,20 +29,20 @@ impl<'compiler> Compiler<'compiler> {
 
     pub fn compile(
         &'compiler mut self,
-        source: &'compiler String,
+        source: &'compiler str,
     ) -> RoxResult<()> {
         match self.parse_source_code(source) {
             Err(errors) => {
                 println!("{:?}", errors);
                 InterpretError::compile_error()
             } // TODO: Properly convert errors
-            Ok(declarations) => self.compile_declarations(declarations),
+            Ok(declarations) => self.compile_declarations(&declarations),
         }
     }
 
     fn parse_source_code(
         &self,
-        source: &'compiler String,
+        source: &'compiler str,
     ) -> Result<Vec<Box<Declaration>>, Vec<LalrpopParseError>> {
         let mut errors = Vec::new();
         let declarations: Vec<Box<Declaration>> =
@@ -57,7 +57,7 @@ impl<'compiler> Compiler<'compiler> {
 
     fn compile_declarations(
         &mut self,
-        declarations: Vec<Box<Declaration>>,
+        declarations: &Vec<Box<Declaration>>,
     ) -> RoxResult<()> {
         declarations.iter().for_each(|declaration| {
             match declaration.as_ref() {
@@ -131,10 +131,10 @@ impl<'compiler> Compiler<'compiler> {
                 }
                 self.emit_byte(Byte::Op(OpCode::Return))
             }
-            Statement::While(..)
-            | Statement::For
-            | Statement::If
-            | Statement::Block(..) => {
+            Statement::Block(declarations) => {
+                self.compile_declarations(declarations).unwrap();
+            }
+            Statement::While(..) | Statement::For | Statement::If => {
                 panic!("This statement type has not yet been implemented")
             }
         }
@@ -156,9 +156,9 @@ impl<'compiler> Compiler<'compiler> {
 
     fn execute_operation(
         &mut self,
-        left: &Box<Expression>,
+        left: &Expression,
         operation: &Operation,
-        right: &Box<Expression>,
+        right: &Expression,
     ) {
         // The order of these is important so that they are popped off the stack in order
         self.expression(right);
@@ -173,6 +173,10 @@ impl<'compiler> Compiler<'compiler> {
             Operation::Multiply => self.emit_byte(Byte::Op(OpCode::Multiply)),
             Operation::Divide => self.emit_byte(Byte::Op(OpCode::Divide)),
             Operation::Modulo => self.emit_byte(Byte::Op(OpCode::Modulo)),
+            Operation::GreaterThan => {
+                self.emit_byte(Byte::Op(OpCode::GreaterThan))
+            }
+            Operation::LessThan => self.emit_byte(Byte::Op(OpCode::LessThan)),
         }
     }
 

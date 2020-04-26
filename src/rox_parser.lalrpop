@@ -9,15 +9,15 @@ pub Program: Vec<Box<Declaration>> = {
 }
 
 pub Declaration: Box<Declaration> = {
-    <Statement> ";" => Box::new(Declaration::Statement(<>)),
+    <Statement> => Box::new(Declaration::Statement(<>)),
     "let" <Identifier> "=" <Expression> ";" => Box::new(Declaration::Variable(<>)),
 }
 
 Statement: Box<Statement> = {
-    "{" <(Declaration)*> "}" => Box::new(Statement::Block(<>)),
-    <TopExpression> => Box::new(Statement::Expression(<>)),
-    "print" <TopExpression> => Box::new(Statement::Print(<>)),
-    "return" <e:TopExpression?> => match e {
+    <TopExpression> ";" => Box::new(Statement::Expression(<>)),
+    "{" <(<Declaration>)*> "}" => Box::new(Statement::Block(<>)),
+    "print" <TopExpression> ";" => Box::new(Statement::Print(<>)),
+    "return" <e:TopExpression?> ";" => match e {
         None => Box::new(Statement::Return(None)),
         Some(e) => Box::new(Statement::Return(Some(e))),
     }

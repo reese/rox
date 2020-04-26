@@ -1,0 +1,14 @@
+let x = 1;
+{
+    let y = 2;
+    print "This should be 3";
+    print x + y;
+    {
+        let z = 3;
+        y = 4;
+        print "This should be 8";
+        print x + y + z;
+    }
+}
+let y = 400;
+x = y;

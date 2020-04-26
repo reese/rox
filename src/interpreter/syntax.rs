@@ -22,6 +22,9 @@ pub enum Operation {
     Multiply,
     Divide,
     Modulo,
+
+    GreaterThan,
+    LessThan,
 }
 
 #[derive(Debug)]
