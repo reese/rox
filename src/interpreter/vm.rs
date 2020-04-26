@@ -53,26 +53,12 @@ impl<'vm, 'chunk> VM<'vm> {
                     self.binary_operation(Operation::LessThan)
                 }
                 Byte::Op(OpCode::Negate) => {
-                    if !self.peek_next().is_number() {
-                        result =
-                            Some(self.runtime_error(
-                                "Could not negate non-number type",
-                            ))
-                    } else {
-                        let next_constant = self.get_next_constant();
-                        self.constant_stack.push(-next_constant)
-                    }
+                    let next_constant = self.get_next_constant();
+                    self.constant_stack.push(-next_constant)
                 }
                 Byte::Op(OpCode::Not) => {
-                    if !self.peek_next().is_bool() {
-                        result =
-                            Some(self.runtime_error(
-                                "Could not negate non-bool type.",
-                            ))
-                    } else {
-                        let next_constant = self.get_next_constant();
-                        self.constant_stack.push(!next_constant);
-                    }
+                    let next_constant = self.get_next_constant();
+                    self.constant_stack.push(!next_constant);
                 }
                 Byte::Op(OpCode::True) => self.bool(true),
                 Byte::Op(OpCode::False) => self.bool(false),
@@ -100,17 +86,9 @@ impl<'vm, 'chunk> VM<'vm> {
                 Byte::Op(OpCode::GetVariable) => {
                     let name = self.get_next_constant();
                     let current_scope = self.scope_stack.top();
-                    match current_scope.get(name.get_string_value()) {
-                        Some(value) => self.constant_stack.push(value.clone()),
-                        None => {
-                            result = Some(
-                                self.runtime_error(
-                                    format!("Undefined variable: {}", name)
-                                        .as_ref(),
-                                ),
-                            );
-                        }
-                    }
+                    let value =
+                        current_scope.get(name.get_string_value()).unwrap();
+                    self.constant_stack.push(value.clone());
                 }
                 Byte::Op(OpCode::SetVariable) => {
                     let name = self.get_next_constant();
@@ -119,6 +97,13 @@ impl<'vm, 'chunk> VM<'vm> {
                     let new_scope = current_scope
                         .update(name.get_string_value().clone(), value);
                     self.scope_stack.push(new_scope)
+                }
+                Byte::Op(OpCode::ScopeStart) => {
+                    let top_stack = self.scope_stack.top().clone();
+                    self.scope_stack.push(top_stack);
+                }
+                Byte::Op(OpCode::ScopeEnd) => {
+                    self.scope_stack.pop();
                 }
                 Byte::Op(OpCode::Pop) => {
                     self.constant_stack.pop();
@@ -169,15 +154,7 @@ impl<'vm, 'chunk> VM<'vm> {
         self.constant_stack.push(Value::Bool(val));
     }
 
-    fn peek_next(&self) -> &Value {
-        self.constant_stack.top()
-    }
-
     fn print(&mut self) {
         println!("{}", self.get_next_constant())
-    }
-
-    fn runtime_error<T>(&self, message: &str) -> RoxResult<T> {
-        InterpretError::runtime_error(message)
     }
 }

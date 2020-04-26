@@ -132,7 +132,9 @@ impl<'compiler> Compiler<'compiler> {
                 self.emit_byte(Byte::Op(OpCode::Return))
             }
             Statement::Block(declarations) => {
+                self.emit_byte(Byte::Op(OpCode::ScopeStart));
                 self.compile_declarations(declarations).unwrap();
+                self.emit_byte(Byte::Op(OpCode::ScopeEnd));
             }
             Statement::While(..) | Statement::For | Statement::If => {
                 panic!("This statement type has not yet been implemented")
@@ -193,8 +195,8 @@ impl<'compiler> Compiler<'compiler> {
         )
     }
 
-    fn string(&mut self, string: &String) {
-        let val = Value::create_string(string.clone());
+    fn string(&mut self, string: &str) {
+        let val = Value::create_string(string.to_string());
         self.emit_constant(val)
     }
 
@@ -205,8 +207,8 @@ impl<'compiler> Compiler<'compiler> {
 
     fn variable_declaration(
         &mut self,
-        identifier: &String,
-        expression: &Box<Expression>,
+        identifier: &str,
+        expression: &Expression,
     ) {
         self.expression(expression);
         let variable_constant = self.identifier_constant(identifier);
@@ -228,7 +230,7 @@ impl<'compiler> Compiler<'compiler> {
         )
     }
 
-    fn identifier_constant(&mut self, identifier_text: &String) -> u8 {
-        self.make_constant(Value::create_string(identifier_text.clone()))
+    fn identifier_constant(&mut self, identifier_text: &str) -> u8 {
+        self.make_constant(Value::create_string(String::from(identifier_text)))
     }
 }

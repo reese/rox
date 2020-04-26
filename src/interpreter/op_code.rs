@@ -28,6 +28,9 @@ pub enum OpCode {
     GetVariable,
     SetVariable,
 
+    ScopeStart,
+    ScopeEnd,
+
     Print,
     Return,
 }

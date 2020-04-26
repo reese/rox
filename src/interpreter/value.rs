@@ -89,20 +89,6 @@ impl Value {
         }
     }
 
-    pub fn is_number(&self) -> bool {
-        match self {
-            Value::Float(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_bool(&self) -> bool {
-        match self {
-            Value::Bool(_) => true,
-            _ => false,
-        }
-    }
-
     pub fn get_string_value(&self) -> &String {
         match self {
             Value::Object(obj) => return obj.get_string_value(),
