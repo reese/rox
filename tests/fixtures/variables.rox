@@ -1,0 +1,10 @@
+let first_greeting = "Hello there!";
+let second_greeting = "Howdy, folks!";
+first_greeting = second_greeting;
+
+let num1 = 1234;
+let yet_another_number = 0001.1423;
+let combination = num1 + yet_another_number;
+
+yet_another_number = yet_another_number + 2;
+num1 = (combination + 4) - yet_another_number * 6;

@@ -1,6 +1,7 @@
 [package]
 name = "rox"
 version = "0.0.1"
+description = "The Rox Programming Language"
 authors = ["Reese Williams <reese@reesew.io>"]
 edition = "2018"
 
@@ -16,11 +17,10 @@ path = "src/bin/rox.rs"
 lalrpop = { version = "0.18.1", features = ["lexer"] }
 
 [dependencies]
+im = "14.3.0"
 lalrpop-util = "0.18.1"
 regex = "1"
 text_io = "0.1.7"
-num-traits = "*"
-num-derive = "*"
 
 [dev-dependencies]
 rusty-hook = "^0.10.3"
