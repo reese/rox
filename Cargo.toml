@@ -5,6 +5,11 @@ license = "MIT AND Apache-2.0"
 description = "The Rox Programming Language"
 authors = ["Reese Williams <reese@reesew.io>"]
 edition = "2018"
+readme = "README.md"
+repository = "https://github.com/reese/rox"
+homepage = "https://github.com/reese/rox"
+categories = ["command-line-utilities"]
+keywords = ["compiler", "programming language", "rox"]
 
 [lib]
 name = "rox"
