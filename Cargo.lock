@@ -562,7 +562,7 @@ version = "0.6.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "rox"
+name = "rox-lang"
 version = "0.0.0"
 dependencies = [
  "im 14.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
