@@ -38,7 +38,7 @@ pub enum Statement {
     Print(Box<Expression>),
     Return(Option<Box<Expression>>),
     While(Box<Expression>, Box<Statement>),
-    Block(Box<Declaration>),
+    Block(Vec<Box<Declaration>>),
 }
 
 #[derive(Debug)]

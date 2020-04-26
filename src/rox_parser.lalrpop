@@ -14,6 +14,7 @@ pub Declaration: Box<Declaration> = {
 }
 
 Statement: Box<Statement> = {
+    "{" <(Declaration)*> "}" => Box::new(Statement::Block(<>)),
     <TopExpression> => Box::new(Statement::Expression(<>)),
     "print" <TopExpression> => Box::new(Statement::Print(<>)),
     "return" <e:TopExpression?> => match e {

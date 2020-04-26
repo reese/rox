@@ -24,9 +24,9 @@ pub enum OpCode {
 
     Pop,
 
-    DefineGlobal,
-    GetGlobal,
-    SetGlobal,
+    DefineVariable,
+    GetVariable,
+    SetVariable,
 
     Print,
     Return,

@@ -185,7 +185,7 @@ impl<'compiler> Compiler<'compiler> {
         self.expression(expression);
         self.emit_bytes(
             Byte::Constant(identifier_constant),
-            Byte::Op(OpCode::SetGlobal),
+            Byte::Op(OpCode::SetVariable),
         )
     }
 
@@ -212,7 +212,7 @@ impl<'compiler> Compiler<'compiler> {
     fn define_variable(&mut self, variable_constant: u8) {
         self.emit_bytes(
             Byte::Constant(variable_constant),
-            Byte::Op(OpCode::DefineGlobal),
+            Byte::Op(OpCode::DefineVariable),
         );
     }
 
@@ -220,7 +220,7 @@ impl<'compiler> Compiler<'compiler> {
         let identifier_constant = self.identifier_constant(identifier);
         self.emit_bytes(
             Byte::Constant(identifier_constant),
-            Byte::Op(OpCode::GetGlobal),
+            Byte::Op(OpCode::GetVariable),
         )
     }
 
