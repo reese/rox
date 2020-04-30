@@ -5,7 +5,7 @@ use super::op_code::OpCode;
 use super::value::Value;
 use crate::interpreter::{
     Block, Declaration, Expression, InterpretError, Operation, Push, RoxResult,
-    Statement,
+    Statement, Unary,
 };
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ErrorRecovery;
@@ -113,6 +113,9 @@ impl<'compiler> Compiler<'compiler> {
                 self.execute_operation(left, operation, right)
             }
             Expression::Or(left, right) => self.or_expression(left, right),
+            Expression::Unary(unary, expression) => {
+                self.unary(unary, expression)
+            }
             Expression::ParseError => {
                 panic!("Somehow the parse errors got through to execution.")
             }
@@ -330,5 +333,13 @@ impl<'compiler> Compiler<'compiler> {
 
     fn identifier_constant(&mut self, identifier_text: &str) -> u8 {
         self.make_constant(Value::create_string(String::from(identifier_text)))
+    }
+
+    fn unary(&mut self, unary: &Unary, expression: &Expression) {
+        self.expression(expression);
+        match unary {
+            Unary::Not => self.emit_byte(Byte::Op(OpCode::Not)),
+            Unary::Negate => self.emit_byte(Byte::Op(OpCode::Negate)),
+        }
     }
 }

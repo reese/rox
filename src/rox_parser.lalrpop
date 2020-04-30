@@ -1,4 +1,4 @@
-use crate::interpreter::{Block, Declaration, Expression, Operation, Statement};
+use crate::interpreter::{Block, Declaration, Expression, Operation, Statement, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
@@ -8,9 +8,9 @@ pub Program: Vec<Box<Declaration>> = {
     <(<Declaration>)*>
 }
 
-pub Declaration: Box<Declaration> = {
+Declaration: Box<Declaration> = {
     <Statement> => Box::new(Declaration::Statement(<>)),
-    "let" <Identifier> "=" <Expression> ";" => Box::new(Declaration::Variable(<>)),
+    "let" <Identifier> "=" <TopExpression> ";" => Box::new(Declaration::Variable(<>)),
 }
 
 Statement: Box<Statement> = {
@@ -90,7 +90,13 @@ Term: Box<Expression> = {
     Num => Box::new(Expression::Number(<>)),
     Identifier => Box::new(Expression::Identifier(<>)),
     String => Box::new(Expression::String(<>)),
+    Unary Term => Box::new(Expression::Unary(<>)),
     "(" <Expression> ")"
+};
+
+Unary: Unary = {
+    "!" => Unary::Not,
+    "-" => Unary::Negate,
 };
 
 Boolean: bool = {

@@ -8,6 +8,7 @@ pub enum Expression {
     Operation(Box<Expression>, Operation, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     String(String),
+    Unary(Unary, Box<Expression>),
     ParseError,
 }
 
@@ -23,6 +24,12 @@ pub enum Operation {
     Multiply,
     Divide,
     Modulo,
+}
+
+#[derive(Debug)]
+pub enum Unary {
+    Not,
+    Negate,
 }
 
 #[derive(Debug)]
