@@ -1,19 +1,18 @@
 #[derive(Debug)]
 pub enum Expression {
+    And(Box<Expression>, Box<Expression>),
     Assignment(String, Box<Expression>),
     Boolean(bool),
     Identifier(String),
     Number(f64),
     Operation(Box<Expression>, Operation, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
     String(String),
     ParseError,
 }
 
 #[derive(Debug)]
 pub enum Operation {
-    And,
-    Or,
-
     Equals,
     NotEquals,
 

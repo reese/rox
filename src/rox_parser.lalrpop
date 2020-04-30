@@ -16,7 +16,7 @@ pub Declaration: Box<Declaration> = {
 Statement: Box<Statement> = {
     <TopExpression> ";" => Box::new(Statement::Expression(<>)),
     <Block> => Box::new(Statement::Block(<>)),
-    "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
+    "if" <TopExpression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
     "print" <TopExpression> ";" => Box::new(Statement::Print(<>)),
     "return" <e:TopExpression?> ";" => match e {
         None => Box::new(Statement::Return(None)),
@@ -34,6 +34,16 @@ Block: Block = {
 
 Assignment: Box<Expression> = {
     <Identifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
+    <LogicOr>
+}
+
+LogicOr: Box<Expression> = {
+    <Expression> "or" <Expression> => Box::new(Expression::Or(<>)),
+    <LogicAnd>
+}
+
+LogicAnd: Box<Expression> = {
+    <Expression> "and" <Expression> => Box::new(Expression::And(<>)),
     <Expression>
 }
 

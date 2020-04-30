@@ -100,6 +100,7 @@ impl<'compiler> Compiler<'compiler> {
 
     fn expression(&mut self, expression: &Expression) {
         match expression {
+            Expression::And(left, right) => self.and_expression(left, right),
             Expression::Assignment(identifier, expression) => {
                 self.assignment(identifier, expression)
             }
@@ -112,6 +113,7 @@ impl<'compiler> Compiler<'compiler> {
             Expression::Operation(left, operation, right) => {
                 self.execute_operation(left, operation, right)
             }
+            Expression::Or(left, right) => self.or_expression(left, right),
             Expression::ParseError => {
                 panic!("Somehow the parse errors got through to execution.")
             }
@@ -194,6 +196,35 @@ impl<'compiler> Compiler<'compiler> {
         self.emit_byte(Byte::Op(OpCode::Pop));
     }
 
+    fn and_expression(
+        &mut self,
+        left_side: &Expression,
+        right_side: &Expression,
+    ) {
+        self.expression(left_side);
+        let end_expression_index = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(Byte::Op(OpCode::Pop));
+        self.expression(right_side);
+        self.patch_jump(end_expression_index);
+    }
+
+    fn or_expression(
+        &mut self,
+        left_side: &Expression,
+        right_side: &Expression,
+    ) {
+        self.expression(left_side);
+        let else_jump_index = self.emit_jump(OpCode::JumpIfFalse);
+        let end_jump = self.emit_jump(OpCode::Jump);
+
+        self.patch_jump(else_jump_index);
+        self.emit_byte(Byte::Op(OpCode::Pop));
+
+        self.expression(right_side);
+
+        self.patch_jump(end_jump);
+    }
+
     fn patch_jump(&mut self, offset: usize) {
         let current_location = self.current_chunk().codes.len();
         self.current_chunk().codes[offset] =
@@ -215,8 +246,6 @@ impl<'compiler> Compiler<'compiler> {
         self.expression(right);
         self.expression(left);
         match operation {
-            Operation::And => self.emit_byte(Byte::Op(OpCode::And)),
-            Operation::Or => self.emit_byte(Byte::Op(OpCode::Or)),
             Operation::Equals => self.emit_byte(Byte::Op(OpCode::Equal)),
             Operation::NotEquals => self.emit_byte(Byte::Op(OpCode::NotEquals)),
             Operation::Add => self.emit_byte(Byte::Op(OpCode::Add)),

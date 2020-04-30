@@ -21,6 +21,15 @@ if false {
     print "This should _also_ be printed";
 }
 
+if true and false {
+    print "This shouldn't show up";
+}
+if true and true {
+    print "This bad boy right here should totally be there.";
+} else {
+    print "Why did this print? It shouldn't have.";
+}
+
 let y = 400;
 x = y;
 print x + y;

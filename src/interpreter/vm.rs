@@ -114,7 +114,6 @@ impl<'vm, 'chunk> VM<'vm> {
                     instruction_pointer += 1;
                     let offset_byte =
                         instructions.get(instruction_pointer).unwrap();
-                    println!("{:#?}", offset_byte);
                     match offset_byte {
                         Byte::Op(OpCode::OpLocation(offset)) => {
                             if !self.get_next_constant().is_true() {
@@ -130,7 +129,6 @@ impl<'vm, 'chunk> VM<'vm> {
                     instruction_pointer += 1;
                     let offset_byte =
                         instructions.get(instruction_pointer).unwrap();
-                    println!("{:#?}", offset_byte);
                     match offset_byte {
                         Byte::Op(OpCode::OpLocation(offset)) => {
                             instruction_pointer += *offset;
