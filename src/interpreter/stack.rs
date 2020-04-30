@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub(crate) struct Stack<T> {
+pub struct Stack<T> {
     stack: Vec<T>,
 }
 

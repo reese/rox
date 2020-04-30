@@ -111,32 +111,27 @@ impl<'vm, 'chunk> VM<'vm> {
                     self.constant_stack.pop();
                 }
                 Byte::Op(OpCode::JumpIfFalse) => {
-                    instruction_pointer += 1;
-                    let offset_byte =
-                        instructions.get(instruction_pointer).unwrap();
-                    match offset_byte {
-                        Byte::Op(OpCode::OpLocation(offset)) => {
-                            if !self.get_next_constant().is_true() {
-                                instruction_pointer += *offset;
-                            }
-                        }
-                        _ => panic!(
-                            "Unexpected byte found in if-statement expression"
-                        ),
+                    let offset = self.get_next_location(
+                        &mut instruction_pointer,
+                        instructions,
+                    );
+                    if !self.get_next_constant().is_true() {
+                        instruction_pointer += *offset;
                     }
                 }
                 Byte::Op(OpCode::Jump) => {
-                    instruction_pointer += 1;
-                    let offset_byte =
-                        instructions.get(instruction_pointer).unwrap();
-                    match offset_byte {
-                        Byte::Op(OpCode::OpLocation(offset)) => {
-                            instruction_pointer += *offset;
-                        }
-                        _ => panic!(
-                            "Unexpected byte found in if-statement expression"
-                        ),
-                    }
+                    let offset = self.get_next_location(
+                        &mut instruction_pointer,
+                        instructions,
+                    );
+                    instruction_pointer += *offset;
+                }
+                Byte::Op(OpCode::Loop) => {
+                    let offset = self.get_next_location(
+                        &mut instruction_pointer,
+                        instructions,
+                    );
+                    instruction_pointer -= *offset;
                 }
                 Byte::Constant(index) => {
                     let constant = self.chunk.constant_at(*index as usize);
@@ -157,14 +152,15 @@ impl<'vm, 'chunk> VM<'vm> {
         let first = self.get_next_constant();
         let second = self.get_next_constant();
         let result = match operation {
-            Operation::Add => second.add(first),
-            Operation::Subtract => second.subtract(first),
-            Operation::Multiply => second.multiply(first),
-            Operation::Divide => second.divide(first),
-            Operation::Equals => second.equals(first),
-            Operation::GreaterThan => second.greater_than(first),
-            Operation::LessThan => second.less_than(first),
-            _ => panic!("Unknown binary operation attempted."),
+            Operation::Add => first.add(second),
+            Operation::Subtract => first.subtract(second),
+            Operation::Multiply => first.multiply(second),
+            Operation::Divide => first.divide(second),
+            Operation::Equals => first.equals(second),
+            Operation::GreaterThan => first.greater_than(second),
+            Operation::LessThan => first.less_than(second),
+            Operation::NotEquals => first.not_equals(second),
+            Operation::Modulo => first.modulo(second),
         };
         match result {
             Ok(val) => self.constant_stack.push(val),
@@ -176,6 +172,19 @@ impl<'vm, 'chunk> VM<'vm> {
         match self.constant_stack.pop() {
             Some(x) => x,
             None => panic!("Nothing on the constants stack to pop"),
+        }
+    }
+
+    fn get_next_location<'a>(
+        &mut self,
+        instruction_pointer: &mut usize,
+        instructions: &'a [Byte],
+    ) -> &'a usize {
+        *instruction_pointer += 1;
+        let offset_byte = instructions.get(*instruction_pointer).unwrap();
+        match offset_byte {
+            Byte::Op(OpCode::OpLocation(offset)) => offset,
+            _ => panic!("Unexpected byte found in if-statement expression"),
         }
     }
 

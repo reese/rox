@@ -38,4 +38,5 @@ pub enum OpCode {
     Jump,
     Placeholder, // This is a placeholder op that's replaced after a jump point is parsed
     OpLocation(usize),
+    Loop,
 }

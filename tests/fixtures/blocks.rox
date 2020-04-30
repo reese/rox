@@ -30,6 +30,12 @@ if true and true {
     print "Why did this print? It shouldn't have.";
 }
 
+let number = 0;
+while number < 10 {
+    print number;
+    number = number + 1;
+}
+
 let y = 400;
 x = y;
 print x + y;

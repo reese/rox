@@ -71,10 +71,34 @@ impl Value {
         }
     }
 
+    pub fn not_equals(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Bool(first.ne(&second)))
+            }
+            (Value::Bool(first), Value::Bool(second)) => {
+                Ok(Value::Bool(first != second))
+            }
+            (Value::Object(first), Value::Object(second)) => Ok(Value::Bool(
+                !first.as_ref().has_equal_content(second.as_ref()),
+            )),
+            _ => panic!("Cannot compare equality of mismatched types"),
+        }
+    }
+
     pub fn less_than(self, other: Self) -> RoxResult<Value> {
         match (self, other) {
             (Value::Float(first), Value::Float(second)) => {
                 Ok(Value::Bool(first < second))
+            }
+            _ => panic!("Cannot compare non-float types"),
+        }
+    }
+
+    pub fn modulo(self, other: Self) -> RoxResult<Value> {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Ok(Value::Float(first % second))
             }
             _ => panic!("Cannot compare non-float types"),
         }

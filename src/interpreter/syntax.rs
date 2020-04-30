@@ -15,15 +15,14 @@ pub enum Expression {
 pub enum Operation {
     Equals,
     NotEquals,
+    GreaterThan,
+    LessThan,
 
     Add,
     Subtract,
     Multiply,
     Divide,
     Modulo,
-
-    GreaterThan,
-    LessThan,
 }
 
 #[derive(Debug)]
@@ -37,11 +36,10 @@ pub type Block = Vec<Box<Declaration>>;
 #[derive(Debug)]
 pub enum Statement {
     Expression(Box<Expression>),
-    For,
     IfElse(Box<Expression>, Block, Option<Block>),
     Print(Box<Expression>),
     Return(Option<Box<Expression>>),
-    While(Box<Expression>, Box<Statement>),
+    While(Box<Expression>, Block),
     Block(Block),
 }
 

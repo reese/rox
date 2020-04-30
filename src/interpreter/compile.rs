@@ -45,10 +45,9 @@ impl<'compiler> Compiler<'compiler> {
         source: &'compiler str,
     ) -> Result<Vec<Box<Declaration>>, Vec<LalrpopParseError>> {
         let mut errors = Vec::new();
-        let declarations: Vec<Box<Declaration>> =
-            rox_parser::ProgramParser::new()
-                .parse(&mut errors, source)
-                .unwrap();
+        let declarations = rox_parser::ProgramParser::new()
+            .parse(&mut errors, source)
+            .unwrap();
         match errors.clone() {
             empty_vec if empty_vec.is_empty() => Ok(declarations),
             error_vec => Err(error_vec),
@@ -57,7 +56,7 @@ impl<'compiler> Compiler<'compiler> {
 
     fn compile_declarations(
         &mut self,
-        declarations: &Vec<Box<Declaration>>,
+        declarations: &[Box<Declaration>],
     ) -> RoxResult<()> {
         declarations.iter().for_each(|declaration| {
             match declaration.as_ref() {
@@ -141,8 +140,8 @@ impl<'compiler> Compiler<'compiler> {
             Statement::IfElse(dependent, if_block, else_block) => {
                 self.if_statement(dependent, if_block, else_block);
             }
-            Statement::While(..) | Statement::For => {
-                panic!("This statement type has not yet been implemented")
+            Statement::While(expression, block) => {
+                self.while_statement(expression, block);
             }
         }
     }
@@ -225,6 +224,30 @@ impl<'compiler> Compiler<'compiler> {
         self.patch_jump(end_jump);
     }
 
+    fn while_statement(
+        &mut self,
+        expression: &Expression,
+        block: &[Box<Declaration>],
+    ) {
+        let loop_start_index = self.current_chunk().codes.len();
+        self.expression(expression);
+
+        let end_jump_index = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(Byte::Op(OpCode::Pop));
+        self.compile_declarations(block).unwrap();
+
+        self.emit_loop(loop_start_index);
+        self.patch_jump(end_jump_index);
+        self.emit_byte(Byte::Op(OpCode::Pop));
+    }
+
+    fn emit_loop(&mut self, loop_start_index: usize) {
+        self.emit_byte(Byte::Op(OpCode::Loop));
+        let offset = self.current_chunk().codes.len() - loop_start_index + 1;
+
+        self.emit_byte(Byte::Op(OpCode::OpLocation(offset)));
+    }
+
     fn patch_jump(&mut self, offset: usize) {
         let current_location = self.current_chunk().codes.len();
         self.current_chunk().codes[offset] =
@@ -245,6 +268,7 @@ impl<'compiler> Compiler<'compiler> {
         // The order of these is important so that they are popped off the stack in order
         self.expression(right);
         self.expression(left);
+
         match operation {
             Operation::Equals => self.emit_byte(Byte::Op(OpCode::Equal)),
             Operation::NotEquals => self.emit_byte(Byte::Op(OpCode::NotEquals)),
@@ -260,11 +284,7 @@ impl<'compiler> Compiler<'compiler> {
         }
     }
 
-    fn assignment(
-        &mut self,
-        identifier: &String,
-        expression: &Box<Expression>,
-    ) {
+    fn assignment(&mut self, identifier: &str, expression: &Expression) {
         let identifier_constant = self.identifier_constant(identifier);
         self.expression(expression);
         self.emit_bytes(

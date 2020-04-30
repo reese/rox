@@ -17,6 +17,7 @@ Statement: Box<Statement> = {
     <TopExpression> ";" => Box::new(Statement::Expression(<>)),
     <Block> => Box::new(Statement::Block(<>)),
     "if" <TopExpression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
+    "while" <LogicOr> <Block> => Box::new(Statement::While(<>)),
     "print" <TopExpression> ";" => Box::new(Statement::Print(<>)),
     "return" <e:TopExpression?> ";" => match e {
         None => Box::new(Statement::Return(None)),
@@ -60,7 +61,19 @@ Expression: Box<Expression> = {
 Factor: Box<Expression> = {
     Factor FactorOp Term => Box::new(Expression::Operation(<>)),
     Term,
+    Comparison,
 };
+
+Comparison: Box<Expression> = {
+    Factor ComparisonOp Term => Box::new(Expression::Operation(<>))
+}
+
+ComparisonOp: Operation = {
+    ">" => Operation::GreaterThan,
+    "<" => Operation::LessThan,
+    "==" => Operation::Equals,
+    "!=" => Operation::NotEquals,
+}
 
 FactorOp: Operation = {
     "*" => Operation::Multiply,
