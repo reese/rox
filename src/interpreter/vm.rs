@@ -33,15 +33,17 @@ impl<'vm, 'chunk> VM<'vm> {
         if compiler.compile(source).is_err() {
             return InterpretError::compile_error();
         }
-        let ips = self.chunk.codes.to_vec();
-        self.run(&ips)
+        let instructions = self.chunk.codes.to_vec();
+        self.run(&instructions)
     }
 
     fn run(&mut self, instructions: &[Byte]) -> RoxResult<Value> {
-        let mut result = None;
-        instructions
-            .iter()
-            .for_each(|instruction| match instruction {
+        let mut instruction_pointer = 0;
+        while instruction_pointer < instructions.len() {
+            let instruction = instructions
+                .get(instruction_pointer)
+                .expect("Instruction pointer out of bounds");
+            match instruction {
                 Byte::Op(OpCode::Return) => {}
                 Byte::Op(OpCode::Equal) => {
                     self.binary_operation(Operation::Equals)
@@ -108,6 +110,36 @@ impl<'vm, 'chunk> VM<'vm> {
                 Byte::Op(OpCode::Pop) => {
                     self.constant_stack.pop();
                 }
+                Byte::Op(OpCode::JumpIfFalse) => {
+                    instruction_pointer += 1;
+                    let offset_byte =
+                        instructions.get(instruction_pointer).unwrap();
+                    println!("{:#?}", offset_byte);
+                    match offset_byte {
+                        Byte::Op(OpCode::OpLocation(offset)) => {
+                            if !self.get_next_constant().is_true() {
+                                instruction_pointer += *offset;
+                            }
+                        }
+                        _ => panic!(
+                            "Unexpected byte found in if-statement expression"
+                        ),
+                    }
+                }
+                Byte::Op(OpCode::Jump) => {
+                    instruction_pointer += 1;
+                    let offset_byte =
+                        instructions.get(instruction_pointer).unwrap();
+                    println!("{:#?}", offset_byte);
+                    match offset_byte {
+                        Byte::Op(OpCode::OpLocation(offset)) => {
+                            instruction_pointer += *offset;
+                        }
+                        _ => panic!(
+                            "Unexpected byte found in if-statement expression"
+                        ),
+                    }
+                }
                 Byte::Constant(index) => {
                     let constant = self.chunk.constant_at(*index as usize);
                     self.constant_stack.push(constant.clone());
@@ -116,12 +148,11 @@ impl<'vm, 'chunk> VM<'vm> {
                     "Encountered unexpected operation: {:?}",
                     byte_code
                 ),
-            });
+            };
 
-        match result {
-            Some(result) => result,
-            None => Ok(Value::Bool(true)),
+            instruction_pointer += 1;
         }
+        Ok(Value::Bool(true))
     }
 
     fn binary_operation(&mut self, operation: Operation) {

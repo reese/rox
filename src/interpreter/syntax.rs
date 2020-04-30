@@ -33,15 +33,17 @@ pub struct Function;
 #[derive(Debug)]
 pub struct Field;
 
+pub type Block = Vec<Box<Declaration>>;
+
 #[derive(Debug)]
 pub enum Statement {
     Expression(Box<Expression>),
     For,
-    If,
+    IfElse(Box<Expression>, Block, Option<Block>),
     Print(Box<Expression>),
     Return(Option<Box<Expression>>),
     While(Box<Expression>, Box<Statement>),
-    Block(Vec<Box<Declaration>>),
+    Block(Block),
 }
 
 #[derive(Debug)]

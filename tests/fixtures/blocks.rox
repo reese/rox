@@ -10,5 +10,17 @@ let x = 1;
         print x + y + z;
     }
 }
+
+if false {
+    print "You shouldn't see this";
+    let a = 1;
+    a = 2;
+    print a;
+} else {
+    print "This should be printed";
+    print "This should _also_ be printed";
+}
+
 let y = 400;
 x = y;
+print x + y;

@@ -4,7 +4,7 @@ use super::chunk::{Byte, Chunk};
 use super::op_code::OpCode;
 use super::value::Value;
 use crate::interpreter::{
-    Declaration, Expression, InterpretError, Operation, Push, RoxResult,
+    Block, Declaration, Expression, InterpretError, Operation, Push, RoxResult,
     Statement,
 };
 use lalrpop_util::lexer::Token;
@@ -136,7 +136,10 @@ impl<'compiler> Compiler<'compiler> {
                 self.compile_declarations(declarations).unwrap();
                 self.emit_byte(Byte::Op(OpCode::ScopeEnd));
             }
-            Statement::While(..) | Statement::For | Statement::If => {
+            Statement::IfElse(dependent, if_block, else_block) => {
+                self.if_statement(dependent, if_block, else_block);
+            }
+            Statement::While(..) | Statement::For => {
                 panic!("This statement type has not yet been implemented")
             }
         }
@@ -149,6 +152,52 @@ impl<'compiler> Compiler<'compiler> {
 
     fn boolean(&mut self, val: &bool) {
         self.emit_constant(Value::Bool(*val))
+    }
+
+    fn emit_jump(&mut self, op: OpCode) -> usize {
+        self.emit_byte(Byte::Op(op));
+        self.emit_byte(Byte::Op(OpCode::Placeholder));
+        self.current_chunk().codes.len() - 1
+    }
+
+    /// # Control flow
+    /// Control flow in the VM can be a little tough to wrap your head around.
+    /// For some reference, it may be useful to read the
+    /// [section](https://craftinginterpreters.com/jumping-back-and-forth.html#if-statements)
+    /// in "Crafting Interpreters" on them. In short, what we do is emit a placeholder
+    /// byte, parse the body of the block, and then once we finish the block, replace
+    /// the placeholder with the length of the block's instructions.
+    ///
+    /// For example, if we start an if statement at instruction 5, instruction 6 will be a placeholder.
+    /// Then, we will parse a block, say of length 7. We're now at instruction 13, so
+    /// to get the offset we get the length of the block, which is the current instruction location
+    /// minus the location of the placeholder (so here, `13 - 6`), and replace the placeholder
+    /// with that value. We then do essentially the same thing if there's an `else` statement.
+    fn if_statement(
+        &mut self,
+        dependent_expression: &Expression,
+        if_block: &Block,
+        optional_else_block: &Option<Block>,
+    ) {
+        self.expression(dependent_expression);
+        let if_placeholder_index = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(Byte::Op(OpCode::Pop));
+        self.compile_declarations(if_block).unwrap();
+
+        let else_placeholder_index = self.emit_jump(OpCode::Jump);
+        self.patch_jump(if_placeholder_index);
+
+        if let Some(else_block) = optional_else_block {
+            self.compile_declarations(else_block).unwrap()
+        }
+        self.patch_jump(else_placeholder_index);
+        self.emit_byte(Byte::Op(OpCode::Pop));
+    }
+
+    fn patch_jump(&mut self, offset: usize) {
+        let current_location = self.current_chunk().codes.len();
+        self.current_chunk().codes[offset] =
+            Byte::Op(OpCode::OpLocation(current_location - offset));
     }
 
     fn number(&mut self, number: &f64) {

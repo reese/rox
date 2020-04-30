@@ -11,6 +11,9 @@ homepage = "https://github.com/reese/rox"
 categories = ["command-line-utilities"]
 keywords = ["compiler", "programming language", "rox"]
 
+[package.metadata.docs.rs]
+document-private-items = true
+
 [lib]
 name = "rox"
 path = "src/lib.rs"

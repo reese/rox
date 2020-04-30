@@ -97,6 +97,15 @@ impl Value {
             ),
         }
     }
+
+    pub fn is_true(&self) -> &bool {
+        match self {
+            Value::Bool(val) => val,
+            _ => {
+                panic!("Attempted to retrieve boolean value from non-bool type")
+            }
+        }
+    }
 }
 
 impl Neg for Value {

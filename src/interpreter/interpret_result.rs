@@ -19,11 +19,4 @@ impl InterpretError {
             message: None,
         })
     }
-
-    pub fn runtime_error<T>(message: &str) -> RoxResult<T> {
-        Err(InterpretError {
-            error_type: InterpretErrorType::InterpretRuntimeError,
-            message: Some(String::from(message)),
-        })
-    }
 }

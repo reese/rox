@@ -18,7 +18,6 @@ use interpreter::{
     Chunk, InterpretError, InterpretErrorType, RoxResult, Value, VM,
 };
 use std::fs;
-use std::io::{self, Write};
 use std::path::Path;
 use std::process::exit;
 
@@ -54,7 +53,7 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
     };
 }
 
-fn interpret(input: &String) -> RoxResult<Value> {
+fn interpret(input: &str) -> RoxResult<Value> {
     let chunk = &mut Chunk::new();
     VM::new(chunk).interpret(input)
 }

@@ -1,4 +1,4 @@
-use crate::interpreter::{Declaration, Expression, Operation, Statement};
+use crate::interpreter::{Block, Declaration, Expression, Operation, Statement};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
@@ -15,7 +15,8 @@ pub Declaration: Box<Declaration> = {
 
 Statement: Box<Statement> = {
     <TopExpression> ";" => Box::new(Statement::Expression(<>)),
-    "{" <(<Declaration>)*> "}" => Box::new(Statement::Block(<>)),
+    <Block> => Box::new(Statement::Block(<>)),
+    "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
     "print" <TopExpression> ";" => Box::new(Statement::Print(<>)),
     "return" <e:TopExpression?> ";" => match e {
         None => Box::new(Statement::Return(None)),
@@ -25,6 +26,10 @@ Statement: Box<Statement> = {
 
 TopExpression: Box<Expression> = {
     <Assignment>
+}
+
+Block: Block = {
+    "{" <(<Declaration>)*> "}",
 }
 
 Assignment: Box<Expression> = {
