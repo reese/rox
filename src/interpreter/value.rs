@@ -1,118 +1,35 @@
 use super::traits::Push;
 use crate::interpreter::{Object, RoxResult};
 use std::fmt::Formatter;
-use std::ops::Neg;
+use std::ops::{Div, Mul, Neg, Rem, Sub};
 use std::rc::Rc;
 
-#[derive(Clone, Debug)]
+/// # Values
+/// The `Value` enum represents the core value types in Rox.
+/// With the exception of numbers (which are all floats in Rox) and booleans,
+/// all other values in Rox are heap-allocated `Object`s. All `Object`s are
+/// reference-counted and thus are garbage collected when all references go out of scope.
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub enum Value {
+    /// `Bool` represents standard boolean values (`true` and `false`).
     Bool(bool),
+    /// All numbers in Rox are stored as Rust's `f64` type. This is likely to change
+    /// in the future.
     Float(f64),
+    /// All values that are not `Bool` or `Float` values are reference-counted `Object`s that
+    /// are allocated on the heap. This includes strings, records, functions, etc.
     Object(Rc<Object>),
 }
 
 impl Value {
+    /// Creates a `Value::String` from a Rust `String` value
     pub fn create_string(string: String) -> Self {
         let object = Rc::new(Object::String(string));
         Value::Object(object)
     }
 
-    pub fn add(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Float(first + second))
-            }
-            (Value::Object(first), Value::Object(second)) => {
-                Ok(Value::Object(Rc::from(first.concatenate(&second))))
-            }
-            _ => panic!("Cannot add two non-float types."),
-        }
-    }
-
-    pub fn subtract(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Float(first - second))
-            }
-            _ => panic!("Cannot subtract two non-float types."),
-        }
-    }
-
-    pub fn divide(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Float(first / second))
-            }
-            _ => panic!("Cannot divide two non-float types."),
-        }
-    }
-
-    pub fn multiply(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Float(first * second))
-            }
-            _ => panic!("Cannot multiply two non-float types."),
-        }
-    }
-
-    pub fn equals(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Bool(first.eq(&second)))
-            }
-            (Value::Bool(first), Value::Bool(second)) => {
-                Ok(Value::Bool(first == second))
-            }
-            (Value::Object(first), Value::Object(second)) => Ok(Value::Bool(
-                first.as_ref().has_equal_content(second.as_ref()),
-            )),
-            _ => panic!("Cannot compare equality of mismatched types"),
-        }
-    }
-
-    pub fn not_equals(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Bool(first.ne(&second)))
-            }
-            (Value::Bool(first), Value::Bool(second)) => {
-                Ok(Value::Bool(first != second))
-            }
-            (Value::Object(first), Value::Object(second)) => Ok(Value::Bool(
-                !first.as_ref().has_equal_content(second.as_ref()),
-            )),
-            _ => panic!("Cannot compare equality of mismatched types"),
-        }
-    }
-
-    pub fn less_than(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Bool(first < second))
-            }
-            _ => panic!("Cannot compare non-float types"),
-        }
-    }
-
-    pub fn modulo(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Float(first % second))
-            }
-            _ => panic!("Cannot compare non-float types"),
-        }
-    }
-
-    pub fn greater_than(self, other: Self) -> RoxResult<Value> {
-        match (self, other) {
-            (Value::Float(first), Value::Float(second)) => {
-                Ok(Value::Bool(first > second))
-            }
-            _ => panic!("Cannot compare non-float types"),
-        }
-    }
-
+    /// Gets the Rust `String` value from the object.
+    /// This panics if the `Value` is not a `Object::String` variant.
     pub fn get_string_value(&self) -> &String {
         match self {
             Value::Object(obj) => obj.get_string_value(),
@@ -122,6 +39,8 @@ impl Value {
         }
     }
 
+    /// Checks if Value::Bool is `true`. This panics if the value is
+    /// not a `Bool` variant.
     pub fn is_true(&self) -> &bool {
         match self {
             Value::Bool(val) => val,
@@ -138,6 +57,70 @@ impl Neg for Value {
         match self {
             Value::Float(num) => Value::Float(-num),
             _ => panic!("Cannot negate non-numeric type."),
+        }
+    }
+}
+
+impl std::ops::Add for Value {
+    type Output = Self;
+    fn add(self, other: Self) -> Value {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Value::Float(first + second)
+            }
+            (Value::Object(first), Value::Object(second)) => {
+                Value::Object(Rc::from(first.concatenate(&second)))
+            }
+            _ => panic!("Cannot add two non-float types."),
+        }
+    }
+}
+
+impl std::ops::Div for Value {
+    type Output = Self;
+    fn div(self, other: Self) -> Self {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Value::Float(first / second)
+            }
+            _ => panic!("Cannot divide two non-float types."),
+        }
+    }
+}
+
+impl std::ops::Mul for Value {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Value::Float(first * second)
+            }
+            _ => panic!("Cannot multiply two non-float types."),
+        }
+    }
+}
+
+impl std::ops::Sub for Value {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Value::Float(first - second)
+            }
+            _ => panic!("Cannot subtract two non-float types."),
+        }
+    }
+}
+
+impl std::ops::Rem for Value {
+    type Output = Self;
+
+    fn rem(self, other: Self) -> Self {
+        match (self, other) {
+            (Value::Float(first), Value::Float(second)) => {
+                Value::Float(first % second)
+            }
+            _ => panic!("Cannot compare non-float types"),
         }
     }
 }

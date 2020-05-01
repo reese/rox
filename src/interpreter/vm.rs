@@ -5,6 +5,7 @@ use super::op_code::OpCode;
 use super::value::Value;
 use crate::interpreter::{Operation, Stack};
 use im::HashMap;
+use std::ops::Add;
 
 type Environment = HashMap<String, Value>;
 
@@ -152,20 +153,17 @@ impl<'vm, 'chunk> VM<'vm> {
         let first = self.get_next_constant();
         let second = self.get_next_constant();
         let result = match operation {
-            Operation::Add => first.add(second),
-            Operation::Subtract => first.subtract(second),
-            Operation::Multiply => first.multiply(second),
-            Operation::Divide => first.divide(second),
-            Operation::Equals => first.equals(second),
-            Operation::GreaterThan => first.greater_than(second),
-            Operation::LessThan => first.less_than(second),
-            Operation::NotEquals => first.not_equals(second),
-            Operation::Modulo => first.modulo(second),
+            Operation::Add => first + second,
+            Operation::Subtract => first - second,
+            Operation::Multiply => first * second,
+            Operation::Divide => first / second,
+            Operation::Equals => Value::Bool(first == second),
+            Operation::GreaterThan => Value::Bool(first > second),
+            Operation::LessThan => Value::Bool(first < second),
+            Operation::NotEquals => Value::Bool(first != second),
+            Operation::Modulo => first % second,
         };
-        match result {
-            Ok(val) => self.constant_stack.push(val),
-            Err(error) => panic!(error.message),
-        }
+        self.constant_stack.push(result);
     }
 
     fn get_next_constant(&mut self) -> Value {

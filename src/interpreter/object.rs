@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 
-#[derive(Debug)]
+#[derive(Debug, Ord, PartialOrd, PartialEq, Eq)]
 pub enum Object {
     String(String),
 }
