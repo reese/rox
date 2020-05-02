@@ -22,6 +22,10 @@ path = "src/lib.rs"
 name = "rox"
 path = "src/bin/rox.rs"
 
+[[bench]]
+name = "benchmark"
+harness = false
+
 [build-dependencies]
 lalrpop = { version = "0.18.1", features = ["lexer"] }
 
@@ -29,3 +33,6 @@ lalrpop = { version = "0.18.1", features = ["lexer"] }
 im = "14.3.0"
 lalrpop-util = "0.18.1"
 regex = "1"
+
+[dev-dependencies]
+criterion = "0.3.2"

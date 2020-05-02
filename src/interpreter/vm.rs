@@ -80,6 +80,9 @@ impl VM {
                 Byte::Op(OpCode::Divide) => {
                     self.binary_operation(Operation::Divide)
                 }
+                Byte::Op(OpCode::Modulo) => {
+                    self.binary_operation(Operation::Modulo)
+                }
                 Byte::Op(OpCode::Print) => self.print(),
                 Byte::Op(OpCode::Constant) => {}
                 Byte::Op(OpCode::DefineVariable) => {
