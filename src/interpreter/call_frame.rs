@@ -32,7 +32,7 @@ impl CallFrame {
     pub fn push_constant(&mut self, value: Value) {
         self.slots.push(value);
     }
-    
+
     pub fn pop_constant(&mut self) -> Option<Value> {
         self.slots.pop()
     }
