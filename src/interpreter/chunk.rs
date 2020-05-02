@@ -2,13 +2,13 @@ use super::op_code::OpCode;
 use super::traits::Push;
 use super::value::{Value, ValueArray};
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub enum Byte {
     Op(OpCode),
     Constant(u8),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub struct Chunk {
     pub codes: Vec<Byte>,
     pub constants: ValueArray,

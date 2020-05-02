@@ -15,14 +15,14 @@ extern crate lalrpop_util;
 mod interpreter;
 
 pub use interpreter::Value;
-use interpreter::{Chunk, InterpretError, InterpretErrorType, RoxResult, VM};
+use interpreter::{InterpretError, InterpretErrorType, RoxResult, VM};
 use std::fs;
 use std::path::Path;
 use std::process::exit;
 
 /// # `Rox` macro
 /// The `rox!` macro allows you to embed `rox` directly
-/// into your rust applications.
+/// into your Rust applications.
 ///
 /// ```
 /// # #[macro_use]
@@ -82,6 +82,5 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
 /// The `interpret` function runs the given source code (as a `&str`)
 /// through the interpreter and returns the resulting value.
 pub fn interpret(input: &str) -> RoxResult<Value> {
-    let chunk = &mut Chunk::new();
-    VM::new(chunk).interpret(input)
+    VM::new().interpret(input)
 }

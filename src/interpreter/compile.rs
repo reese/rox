@@ -3,6 +3,7 @@ use std::str;
 use super::chunk::{Byte, Chunk};
 use super::op_code::OpCode;
 use super::value::Value;
+use crate::interpreter::function::Function;
 use crate::interpreter::{
     Block, Declaration, Expression, InterpretError, Operation, Push, RoxResult,
     Statement, Unary,
@@ -16,21 +17,18 @@ type LalrpopParseError<'input> =
     ErrorRecovery<usize, Token<'input>, &'static str>;
 
 #[derive(Debug)]
-pub struct Compiler<'a> {
-    compiling_chunk: &'a mut Chunk,
+pub struct Compiler {
+    pub function: Box<Function>,
 }
 
-impl<'compiler> Compiler<'compiler> {
-    pub fn new(chunk: &'compiler mut Chunk) -> Compiler<'compiler> {
+impl Compiler {
+    pub fn new() -> Compiler {
         Compiler {
-            compiling_chunk: chunk,
+            function: Box::new(Function::new(0)),
         }
     }
 
-    pub fn compile(
-        &'compiler mut self,
-        source: &'compiler str,
-    ) -> RoxResult<()> {
+    pub fn compile(&mut self, source: &str) -> RoxResult<()> {
         match self.parse_source_code(source) {
             Err(errors) => {
                 println!("{:?}", errors);
@@ -40,15 +38,15 @@ impl<'compiler> Compiler<'compiler> {
         }
     }
 
-    fn parse_source_code(
-        &self,
-        source: &'compiler str,
-    ) -> Result<Vec<Box<Declaration>>, Vec<LalrpopParseError>> {
+    fn parse_source_code<'a>(
+        &'a self,
+        source: &'a str,
+    ) -> Result<Vec<Declaration>, Vec<LalrpopParseError>> {
         let mut errors = Vec::new();
         let declarations = rox_parser::ProgramParser::new()
             .parse(&mut errors, source)
             .unwrap();
-        match errors.clone() {
+        match errors {
             empty_vec if empty_vec.is_empty() => Ok(declarations),
             error_vec => Err(error_vec),
         }
@@ -56,10 +54,11 @@ impl<'compiler> Compiler<'compiler> {
 
     fn compile_declarations(
         &mut self,
-        declarations: &[Box<Declaration>],
+        declarations: &[Declaration],
     ) -> RoxResult<()> {
-        declarations.iter().for_each(|declaration| {
-            match declaration.as_ref() {
+        declarations
+            .iter()
+            .for_each(|declaration| match declaration {
                 Declaration::Statement(statement) => self.statement(&statement),
                 Declaration::Variable(identifier, expression) => {
                     self.variable_declaration(identifier, expression)
@@ -70,13 +69,12 @@ impl<'compiler> Compiler<'compiler> {
                 Declaration::Record(..) => {
                     panic!("Sorry, I haven't implemented records yet.")
                 }
-            }
-        });
+            });
         Ok(())
     }
 
     fn current_chunk(&mut self) -> &mut Chunk {
-        self.compiling_chunk
+        self.function.get_chunk()
     }
 
     fn emit_byte(&mut self, byte: Byte) {
@@ -230,7 +228,7 @@ impl<'compiler> Compiler<'compiler> {
     fn while_statement(
         &mut self,
         expression: &Expression,
-        block: &[Box<Declaration>],
+        block: &[Declaration],
     ) {
         let loop_start_index = self.current_chunk().codes.len();
         self.expression(expression);

@@ -5,36 +5,35 @@ use super::op_code::OpCode;
 use super::value::Value;
 use crate::interpreter::{Operation, Stack};
 use im::HashMap;
-use std::ops::Add;
 
 type Environment = HashMap<String, Value>;
 
 #[derive(Debug)]
-pub struct VM<'a> {
-    pub chunk: &'a mut Chunk,
+pub struct VM {
+    compiler: Box<Compiler>,
     scope_stack: Stack<Environment>,
     constant_stack: Stack<Value>,
 }
 
-impl<'vm, 'chunk> VM<'vm> {
-    pub fn new(chunk: &'chunk mut Chunk) -> VM {
+impl<'vm, 'chunk> VM {
+    pub fn new() -> VM {
         let initial_scope: Environment = HashMap::new();
         let mut initial_scope_stack = Stack::new();
         initial_scope_stack.push(initial_scope);
 
         VM {
-            chunk,
+            compiler: Box::new(Compiler::new()),
             scope_stack: initial_scope_stack,
             constant_stack: Stack::new(),
         }
     }
 
     pub fn interpret(&mut self, source: &str) -> RoxResult<Value> {
-        let mut compiler = Compiler::new(self.chunk);
-        if compiler.compile(source).is_err() {
+        let result = self.compiler.compile(source);
+        if result.is_err() {
             return InterpretError::compile_error();
         }
-        let instructions = self.chunk.codes.to_vec();
+        let instructions = self.compiler.function.get_chunk().codes.to_vec();
         self.run(&instructions)
     }
 
@@ -135,7 +134,11 @@ impl<'vm, 'chunk> VM<'vm> {
                     instruction_pointer -= *offset;
                 }
                 Byte::Constant(index) => {
-                    let constant = self.chunk.constant_at(*index as usize);
+                    let constant = self
+                        .compiler
+                        .function
+                        .get_chunk()
+                        .constant_at(*index as usize);
                     self.constant_stack.push(constant.clone());
                 }
                 byte_code => unreachable!(

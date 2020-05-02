@@ -1,7 +1,7 @@
 use super::traits::Push;
 use crate::interpreter::{Object, RoxResult};
 use std::fmt::Formatter;
-use std::ops::{Div, Mul, Neg, Rem, Sub};
+use std::ops::Neg;
 use std::rc::Rc;
 
 /// # Values
@@ -146,7 +146,7 @@ impl std::fmt::Display for Value {
 }
 
 // TODO: Can we remove this?
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub struct ValueArray {
     pub values: Vec<Value>,
 }

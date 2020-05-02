@@ -38,7 +38,7 @@ pub struct Function;
 #[derive(Debug)]
 pub struct Field;
 
-pub type Block = Vec<Box<Declaration>>;
+pub type Block = Vec<Declaration>;
 
 #[derive(Debug)]
 pub enum Statement {

@@ -4,13 +4,13 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
 
-pub Program: Vec<Box<Declaration>> = {
+pub Program: Vec<Declaration> = {
     <(<Declaration>)*>
 }
 
-Declaration: Box<Declaration> = {
-    <Statement> => Box::new(Declaration::Statement(<>)),
-    "let" <Identifier> "=" <TopExpression> ";" => Box::new(Declaration::Variable(<>)),
+Declaration: Declaration = {
+    <Statement> => Declaration::Statement(<>),
+    "let" <Identifier> "=" <TopExpression> ";" => Declaration::Variable(<>),
 }
 
 Statement: Box<Statement> = {
