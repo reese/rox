@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 #![doc(
-    html_logo_url = "https://github.com/reese/rox/raw/master/assets/geodude.png"
+    html_logo_url = "https://github.com/reese/rox/raw/master/assets/rox-logo-transparent-bg.png"
 )]
 #![doc(
     html_favicon_url = "https://github.com/reese/rox/raw/master/assets/favicon.png"

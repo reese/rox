@@ -1,7 +1,7 @@
 <div align="center">
 <h1>Rox</h1>
 
-<img src="./assets/geodude.png"  alt="Geodude"/>
+<img src="./assets/rox-banner.png"  alt="Geodude"/>
 </div>
 
 ## Building from source
