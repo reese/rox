@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 #[derive(Debug)]
 pub struct Stack<T> {
     stack: Vec<T>,

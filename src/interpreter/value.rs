@@ -1,5 +1,5 @@
 use super::traits::Push;
-use crate::interpreter::{Object, RoxResult};
+use crate::interpreter::Object;
 use std::fmt::Formatter;
 use std::ops::Neg;
 use std::rc::Rc;

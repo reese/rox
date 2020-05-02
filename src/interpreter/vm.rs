@@ -1,11 +1,10 @@
-use super::chunk::{Byte, Chunk};
+use super::chunk::Byte;
 use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
 use super::op_code::OpCode;
 use super::value::Value;
 use crate::interpreter::{CallFrame, Operation, Stack};
 use im::HashMap;
-use std::borrow::BorrowMut;
 
 type Environment = HashMap<String, Value>;
 

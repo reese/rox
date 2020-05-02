@@ -29,7 +29,7 @@ impl std::fmt::Display for Object {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let display_string = match self {
             Object::String(string) => string,
-            Object::Function(func) => "<func>", // TODO: Make this something more useful
+            Object::Function(_func) => "<func>", // TODO: Make this something more useful
         };
         write!(f, "{}", display_string)
     }
