@@ -11,7 +11,7 @@ use crate::interpreter::{
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ErrorRecovery;
 
-lalrpop_mod!(pub rox_parser);
+lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
 
 type LalrpopParseError<'input> =
     ErrorRecovery<usize, Token<'input>, &'static str>;
@@ -62,12 +62,6 @@ impl Compiler {
                 Declaration::Statement(statement) => self.statement(&statement),
                 Declaration::Variable(identifier, expression) => {
                     self.variable_declaration(identifier, expression)
-                }
-                Declaration::Function(..) => {
-                    panic!("Sorry, I haven't implemented functions yet.")
-                }
-                Declaration::Record(..) => {
-                    panic!("Sorry, I haven't implemented records yet.")
                 }
             });
         Ok(())
@@ -178,7 +172,7 @@ impl Compiler {
     fn if_statement(
         &mut self,
         dependent_expression: &Expression,
-        if_block: &Block,
+        if_block: &[Declaration],
         optional_else_block: &Option<Block>,
     ) {
         self.expression(dependent_expression);
@@ -321,7 +315,7 @@ impl Compiler {
         );
     }
 
-    fn retrieve_variable_value(&mut self, identifier: &String) {
+    fn retrieve_variable_value(&mut self, identifier: &str) {
         let identifier_constant = self.identifier_constant(identifier);
         self.emit_bytes(
             Byte::Constant(identifier_constant),

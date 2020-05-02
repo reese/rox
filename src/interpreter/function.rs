@@ -10,7 +10,7 @@ impl Function {
     pub fn new(arity: u8) -> Self {
         Function {
             arity,
-            chunk: Chunk::new(),
+            chunk: Chunk::default(),
         }
     }
 

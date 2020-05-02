@@ -146,15 +146,9 @@ impl std::fmt::Display for Value {
 }
 
 // TODO: Can we remove this?
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Debug, Default, PartialOrd, PartialEq)]
 pub struct ValueArray {
     pub values: Vec<Value>,
-}
-
-impl ValueArray {
-    pub fn new() -> ValueArray {
-        ValueArray { values: vec![] }
-    }
 }
 
 impl Clone for ValueArray {

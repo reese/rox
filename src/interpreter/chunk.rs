@@ -8,20 +8,13 @@ pub enum Byte {
     Constant(usize),
 }
 
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Debug, Default, PartialOrd, PartialEq)]
 pub struct Chunk {
     pub codes: Vec<Byte>,
     pub constants: ValueArray,
 }
 
 impl Chunk {
-    pub fn new() -> Chunk {
-        Chunk {
-            codes: vec![],
-            constants: ValueArray::new(),
-        }
-    }
-
     pub fn constant_at(&self, index: usize) -> &Value {
         &self.constants.values[index]
     }

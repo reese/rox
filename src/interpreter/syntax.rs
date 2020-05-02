@@ -52,8 +52,8 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub enum Declaration {
-    Function(Function),
-    Record(Vec<Field>),
+    // Function(Function),
+    // Record(Vec<Field>),
     Statement(Box<Statement>),
     Variable(String, Box<Expression>),
 }
