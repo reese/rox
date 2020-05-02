@@ -1,7 +1,7 @@
 ![Rox Logo](./assets/rox-banner.png)
 
-![](https://github.com/<OWNER>/<REPOSITORY>/workflows/<WORKFLOW_NAME>/badge.svg)
-![](https://github.com/<OWNER>/<REPOSITORY>/workflows/<WORKFLOW_NAME>/badge.svg)
+![Build](https://github.com/reese/rox/workflows/Build/badge.svg)
+![Security audit](https://github.com/reese/rox/workflows/Security%20audit/badge.svg)
 
 This is the main repository for the Rox programming language.
 
