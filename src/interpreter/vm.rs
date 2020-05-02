@@ -3,8 +3,9 @@ use super::compile::Compiler;
 use super::interpret_result::{InterpretError, RoxResult};
 use super::op_code::OpCode;
 use super::value::Value;
-use crate::interpreter::{Operation, Stack};
+use crate::interpreter::{CallFrame, Operation, Stack};
 use im::HashMap;
+use std::borrow::BorrowMut;
 
 type Environment = HashMap<String, Value>;
 
@@ -12,10 +13,10 @@ type Environment = HashMap<String, Value>;
 pub struct VM {
     compiler: Box<Compiler>,
     scope_stack: Stack<Environment>,
-    constant_stack: Stack<Value>,
+    call_frame_stack: Stack<Box<CallFrame>>,
 }
 
-impl<'vm, 'chunk> VM {
+impl VM {
     pub fn new() -> VM {
         let initial_scope: Environment = HashMap::new();
         let mut initial_scope_stack = Stack::new();
@@ -24,7 +25,7 @@ impl<'vm, 'chunk> VM {
         VM {
             compiler: Box::new(Compiler::new()),
             scope_stack: initial_scope_stack,
-            constant_stack: Stack::new(),
+            call_frame_stack: Stack::new(),
         }
     }
 
@@ -33,15 +34,21 @@ impl<'vm, 'chunk> VM {
         if result.is_err() {
             return InterpretError::compile_error();
         }
-        let instructions = self.compiler.function.get_chunk().codes.to_vec();
-        self.run(&instructions)
+        self.call_frame_stack.push(Box::new(CallFrame::new(
+            Box::new(self.compiler.function.clone()),
+            0,
+        )));
+        self.run()
     }
 
-    fn run(&mut self, instructions: &[Byte]) -> RoxResult<Value> {
-        let mut instruction_pointer = 0;
-        while instruction_pointer < instructions.len() {
+    fn run(&mut self) -> RoxResult<Value> {
+        let instructions = self.compiler.function.get_chunk().codes.clone();
+
+        while self.get_top_call_frame().get_instruction_pointer()
+            < instructions.len()
+        {
             let instruction = instructions
-                .get(instruction_pointer)
+                .get(self.get_top_call_frame().get_instruction_pointer())
                 .expect("Instruction pointer out of bounds");
             match instruction {
                 Byte::Op(OpCode::Return) => {}
@@ -56,11 +63,11 @@ impl<'vm, 'chunk> VM {
                 }
                 Byte::Op(OpCode::Negate) => {
                     let next_constant = self.get_next_constant();
-                    self.constant_stack.push(-next_constant)
+                    self.get_top_call_frame().push_constant(-next_constant)
                 }
                 Byte::Op(OpCode::Not) => {
                     let next_constant = self.get_next_constant();
-                    self.constant_stack.push(!next_constant);
+                    self.get_top_call_frame().push_constant(!next_constant);
                 }
                 Byte::Op(OpCode::True) => self.bool(true),
                 Byte::Op(OpCode::False) => self.bool(false),
@@ -81,16 +88,18 @@ impl<'vm, 'chunk> VM {
                     let environment = self.scope_stack.pop().unwrap();
                     let new_environment = environment.update(
                         name.get_string_value().clone(),
-                        self.constant_stack.pop().unwrap(),
+                        self.get_top_call_frame().pop_constant().unwrap(),
                     );
                     self.scope_stack.push(new_environment);
                 }
                 Byte::Op(OpCode::GetVariable) => {
                     let name = self.get_next_constant();
                     let current_scope = self.scope_stack.top();
-                    let value =
-                        current_scope.get(name.get_string_value()).unwrap();
-                    self.constant_stack.push(value.clone());
+                    let value = current_scope
+                        .get(name.get_string_value())
+                        .unwrap()
+                        .clone();
+                    self.get_top_call_frame().push_constant(value);
                 }
                 Byte::Op(OpCode::SetVariable) => {
                     let name = self.get_next_constant();
@@ -108,38 +117,33 @@ impl<'vm, 'chunk> VM {
                     self.scope_stack.pop();
                 }
                 Byte::Op(OpCode::Pop) => {
-                    self.constant_stack.pop();
+                    self.get_top_call_frame().pop_constant();
                 }
                 Byte::Op(OpCode::JumpIfFalse) => {
-                    let offset = self.get_next_location(
-                        &mut instruction_pointer,
-                        instructions,
-                    );
+                    let offset = self.get_next_location(&instructions);
                     if !self.get_next_constant().is_true() {
-                        instruction_pointer += *offset;
+                        self.get_top_call_frame()
+                            .increment_instruction_pointer(*offset);
                     }
                 }
                 Byte::Op(OpCode::Jump) => {
-                    let offset = self.get_next_location(
-                        &mut instruction_pointer,
-                        instructions,
-                    );
-                    instruction_pointer += *offset;
+                    let offset = self.get_next_location(&instructions);
+                    self.get_top_call_frame()
+                        .increment_instruction_pointer(*offset);
                 }
                 Byte::Op(OpCode::Loop) => {
-                    let offset = self.get_next_location(
-                        &mut instruction_pointer,
-                        instructions,
-                    );
-                    instruction_pointer -= *offset;
+                    let offset = self.get_next_location(&instructions);
+                    self.get_top_call_frame()
+                        .decrement_instruction_pointer(*offset);
                 }
                 Byte::Constant(index) => {
                     let constant = self
                         .compiler
                         .function
                         .get_chunk()
-                        .constant_at(*index as usize);
-                    self.constant_stack.push(constant.clone());
+                        .constant_at(*index)
+                        .clone();
+                    self.get_top_call_frame().push_constant(constant);
                 }
                 byte_code => unreachable!(
                     "Encountered unexpected operation: {:?}",
@@ -147,9 +151,13 @@ impl<'vm, 'chunk> VM {
                 ),
             };
 
-            instruction_pointer += 1;
+            self.get_top_call_frame().increment_instruction_pointer(1);
         }
         Ok(Value::Bool(true))
+    }
+
+    fn get_top_call_frame(&mut self) -> &mut CallFrame {
+        self.call_frame_stack.top_mut()
     }
 
     fn binary_operation(&mut self, operation: Operation) {
@@ -166,23 +174,22 @@ impl<'vm, 'chunk> VM {
             Operation::NotEquals => Value::Bool(first != second),
             Operation::Modulo => first % second,
         };
-        self.constant_stack.push(result);
+        self.get_top_call_frame().push_constant(result);
     }
 
     fn get_next_constant(&mut self) -> Value {
-        match self.constant_stack.pop() {
+        match self.get_top_call_frame().pop_constant() {
             Some(x) => x,
             None => panic!("Nothing on the constants stack to pop"),
         }
     }
 
-    fn get_next_location<'a>(
-        &mut self,
-        instruction_pointer: &mut usize,
-        instructions: &'a [Byte],
-    ) -> &'a usize {
-        *instruction_pointer += 1;
-        let offset_byte = instructions.get(*instruction_pointer).unwrap();
+    fn get_next_location<'a>(&mut self, instructions: &'a [Byte]) -> &'a usize {
+        let call_frame = self.get_top_call_frame();
+        call_frame.increment_instruction_pointer(1);
+        let offset_byte = instructions
+            .get(call_frame.get_instruction_pointer())
+            .unwrap();
         match offset_byte {
             Byte::Op(OpCode::OpLocation(offset)) => offset,
             _ => panic!("Unexpected byte found in if-statement expression"),
@@ -190,7 +197,7 @@ impl<'vm, 'chunk> VM {
     }
 
     fn bool(&mut self, val: bool) {
-        self.constant_stack.push(Value::Bool(val));
+        self.get_top_call_frame().push_constant(Value::Bool(val));
     }
 
     fn print(&mut self) {

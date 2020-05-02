@@ -27,7 +27,6 @@ use std::process::exit;
 /// ```
 /// # #[macro_use]
 /// # extern crate rox;
-/// use rox::Value;
 /// # fn main() {
 /// let result = rox! {
 ///     let x = 4;

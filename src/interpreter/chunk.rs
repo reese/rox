@@ -5,7 +5,7 @@ use super::value::{Value, ValueArray};
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub enum Byte {
     Op(OpCode),
-    Constant(u8),
+    Constant(usize),
 }
 
 #[derive(Debug, PartialOrd, PartialEq)]
@@ -37,15 +37,15 @@ impl Clone for Chunk {
 }
 
 impl Push<Byte> for Chunk {
-    fn push(&mut self, byte: Byte) -> u8 {
+    fn push(&mut self, byte: Byte) -> usize {
         self.codes.push(byte);
-        (self.codes.len() - 1) as u8
+        self.codes.len() - 1
     }
 }
 
 impl Push<Value> for Chunk {
-    fn push(&mut self, byte: Value) -> u8 {
+    fn push(&mut self, byte: Value) -> usize {
         self.constants.push(byte);
-        (self.constants.values.len() - 1) as u8
+        self.constants.values.len() - 1
     }
 }

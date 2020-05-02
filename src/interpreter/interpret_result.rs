@@ -1,12 +1,12 @@
 pub type RoxResult<T> = std::result::Result<T, InterpretError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InterpretErrorType {
     InterpretCompileError,
     InterpretRuntimeError,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct InterpretError {
     pub error_type: InterpretErrorType,
     pub message: Option<String>,

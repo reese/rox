@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+pub use call_frame::*;
 pub use chunk::*;
 pub use compile::*;
 pub use function::*;
@@ -11,6 +12,7 @@ pub use traits::*;
 pub use value::*;
 pub use vm::*;
 
+mod call_frame;
 mod chunk;
 mod compile;
 mod function;

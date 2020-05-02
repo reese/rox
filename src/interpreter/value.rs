@@ -166,8 +166,8 @@ impl Clone for ValueArray {
 }
 
 impl Push<Value> for ValueArray {
-    fn push(&mut self, value: Value) -> u8 {
+    fn push(&mut self, value: Value) -> usize {
         self.values.push(value);
-        (self.values.len() - 1) as u8
+        self.values.len() - 1
     }
 }

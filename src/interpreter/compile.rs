@@ -16,15 +16,15 @@ lalrpop_mod!(pub rox_parser);
 type LalrpopParseError<'input> =
     ErrorRecovery<usize, Token<'input>, &'static str>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Compiler {
-    pub function: Box<Function>,
+    pub function: Function,
 }
 
 impl Compiler {
     pub fn new() -> Compiler {
         Compiler {
-            function: Box::new(Function::new(0)),
+            function: Function::new(0),
         }
     }
 
@@ -147,7 +147,7 @@ impl Compiler {
         }
     }
 
-    fn make_constant(&mut self, value: Value) -> u8 {
+    fn make_constant(&mut self, value: Value) -> usize {
         let chunk = self.current_chunk();
         chunk.push(value)
     }
@@ -314,7 +314,7 @@ impl Compiler {
         self.define_variable(variable_constant);
     }
 
-    fn define_variable(&mut self, variable_constant: u8) {
+    fn define_variable(&mut self, variable_constant: usize) {
         self.emit_bytes(
             Byte::Constant(variable_constant),
             Byte::Op(OpCode::DefineVariable),
@@ -329,7 +329,7 @@ impl Compiler {
         )
     }
 
-    fn identifier_constant(&mut self, identifier_text: &str) -> u8 {
+    fn identifier_constant(&mut self, identifier_text: &str) -> usize {
         self.make_constant(Value::create_string(String::from(identifier_text)))
     }
 

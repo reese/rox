@@ -1,6 +1,6 @@
 use crate::interpreter::Chunk;
 
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct Function {
     arity: u8,
     chunk: Chunk,

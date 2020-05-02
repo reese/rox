@@ -1,3 +1,3 @@
 pub trait Push<T> {
-    fn push(&mut self, t: T) -> u8;
+    fn push(&mut self, t: T) -> usize;
 }
