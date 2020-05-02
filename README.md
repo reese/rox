@@ -1,5 +1,8 @@
 ![Rox Logo](./assets/rox-banner.png)
 
+![](https://github.com/<OWNER>/<REPOSITORY>/workflows/<WORKFLOW_NAME>/badge.svg)
+![](https://github.com/<OWNER>/<REPOSITORY>/workflows/<WORKFLOW_NAME>/badge.svg)
+
 This is the main repository for the Rox programming language.
 
 ## Building from source
