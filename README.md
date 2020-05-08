@@ -7,5 +7,7 @@ This is the main repository for the Rox programming language.
 
 ## Building from source
 
-The Rox interpreter is built in Rust and can be built using Rust's `cargo` command line tool.
-To run a Rox script, use `cargo run path/to/script.rox`.
+Rox compiles programs using the `cargo` command line tool.
+To compile, use `cargo run path/to/script.rox`.
+For development purposes, Rox always outputs to `test.o` in the working directory.
+This object file can be run using your C compiler with `cc test.o -o <executable>`.
