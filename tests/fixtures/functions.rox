@@ -3,5 +3,8 @@ let test = fn(number) {
         print number;
         number = number + 1;
     }
-};
-test();
+}
+
+let main = fn () {
+    test();
+}

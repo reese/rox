@@ -60,8 +60,10 @@ Expression: Box<Expression> = {
 };
 
 Params: Vec<String> = {
-    <first:Identifier> <mut rest: ("," <Identifier>)*> ","? => {
-        rest.insert(0, first);
+    <first:(Identifier)?> <mut rest: ("," <Identifier>)*> ","? => {
+        if let Some(first_param) = first {
+            rest.insert(0, first_param);
+        }
         rest
     }
 }
