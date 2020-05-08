@@ -12,10 +12,10 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-mod interpreter;
+mod roxc;
 
-use crate::interpreter::Compiler;
-use interpreter::{InterpretError, InterpretErrorType, RoxResult};
+use crate::roxc::Compiler;
+use roxc::{InterpretError, InterpretErrorType, RoxResult};
 use std::fs;
 use std::path::Path;
 use std::process::exit;
@@ -47,10 +47,10 @@ macro_rules! rox {
 }
 
 /// `run_file` reads the contents of the given path
-/// and runs them through the interpreter.
+/// and runs them through the roxc.
 ///
 /// # Errors
-/// Currently, the Rox interpreter exits with a
+/// Currently, the Rox roxc exits with a
 /// `1` error code if it fails during compilation
 /// and a `2` if it fails at runtime. In the future,
 /// it would likely be a good idea to refactor these
@@ -79,7 +79,7 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
 }
 
 /// The `interpret` function runs the given source code (as a `&str`)
-/// through the interpreter and returns the resulting value.
+/// through the roxc and returns the resulting value.
 pub fn interpret(input: &str) -> RoxResult<()> {
     let mut compiler = Compiler::new("test.o");
     compiler.compile(input).unwrap();

@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 
 //! # Rox
-//! This module is the executable module for the Rox interpreter.
+//! This module is the executable module for the Rox roxc.
 extern crate rox;
 
 use rox::run_file;
@@ -11,7 +11,7 @@ use std::process::exit;
 
 // TODO: Make a more robust CLI with `StructOpt`
 /// # Rox
-/// This is the executable for running the Rox interpreter.
+/// This is the executable for running the Rox roxc.
 fn main() {
     let arguments: Vec<String> = args().collect();
     match arguments.len() {

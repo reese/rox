@@ -1,6 +1,6 @@
 use std::{io, str};
 
-use crate::interpreter::{
+use crate::roxc::{
     Declaration, Expression, FunctionTranslator, InterpretError, Operation,
     RoxResult, Stack, Statement, Unary,
 };
