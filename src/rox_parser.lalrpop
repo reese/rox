@@ -1,4 +1,4 @@
-use crate::roxc::{Block, Declaration, Expression, Operation, Statement, Unary};
+use crate::roxc::{Block, Declaration, Expression, Operation, Statement, Param, Type, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
@@ -59,13 +59,17 @@ Expression: Box<Expression> = {
     }
 };
 
-Params: Vec<String> = {
-    <first:(Identifier)?> <mut rest: ("," <Identifier>)*> ","? => {
+Params: Vec<Param> = {
+    <first:(Param)?> <mut rest: ("," <Param>)*> ","? => {
         if let Some(first_param) = first {
             rest.insert(0, first_param);
         }
         rest
     }
+}
+
+Param: Param = {
+    <i:Identifier> ":" <t:Identifier> => (i, t)
 }
 
 Arguments: Vec<Box<Expression>> = {

@@ -34,12 +34,18 @@ pub enum Unary {
 }
 
 #[derive(Debug)]
-pub struct Function;
+pub enum Type {
+    Int,
+    Float,
+    String,
+    UserType(String),
+}
 
 #[derive(Debug)]
 pub struct Field;
 
 pub type Block = Vec<Box<Statement>>;
+pub type Param = (String, String);
 
 #[derive(Debug)]
 pub enum Statement {
@@ -56,6 +62,6 @@ pub enum Statement {
 pub enum Declaration {
     // Record(Vec<Field>),
     // Statement(Box<Statement>),
-    Function(String, Vec<String>, Block),
+    Function(String, Vec<Param>, Block),
     // ,
 }

@@ -1,4 +1,4 @@
-let test = fn(number) {
+let test = fn(number: int) {
     while number < 10 {
         print number;
         number = number + 1;
