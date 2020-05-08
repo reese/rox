@@ -3,6 +3,7 @@ pub enum Expression {
     And(Box<Expression>, Box<Expression>),
     Assignment(String, Box<Expression>),
     Boolean(bool),
+    FunctionCall(String, Option<Vec<Box<Expression>>>),
     Identifier(String),
     Number(f64),
     Operation(Box<Expression>, Operation, Box<Expression>),
@@ -19,11 +20,11 @@ pub enum Operation {
     GreaterThan,
     LessThan,
 
+    // TODO: Add support for +=, -=, /=, and *=
     Add,
     Subtract,
     Multiply,
     Divide,
-    Modulo,
 }
 
 #[derive(Debug)]
@@ -38,7 +39,7 @@ pub struct Function;
 #[derive(Debug)]
 pub struct Field;
 
-pub type Block = Vec<Declaration>;
+pub type Block = Vec<Box<Statement>>;
 
 #[derive(Debug)]
 pub enum Statement {
@@ -48,12 +49,13 @@ pub enum Statement {
     Return(Option<Box<Expression>>),
     While(Box<Expression>, Block),
     Block(Block),
+    Variable(String, Box<Expression>),
 }
 
 #[derive(Debug)]
 pub enum Declaration {
-    // Function(Function),
     // Record(Vec<Field>),
-    Statement(Box<Statement>),
-    Variable(String, Box<Expression>),
+    // Statement(Box<Statement>),
+    Function(String, Vec<String>, Block),
+    // ,
 }

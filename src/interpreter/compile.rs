@@ -1,30 +1,53 @@
-use std::str;
+use std::{io, str};
 
-use super::chunk::{Byte, Chunk};
-use super::op_code::OpCode;
-use super::value::Value;
-use crate::interpreter::function::Function;
 use crate::interpreter::{
-    Block, Declaration, Expression, InterpretError, Operation, Push, RoxResult,
-    Statement, Unary,
+    Declaration, Expression, FunctionTranslator, InterpretError, Operation,
+    RoxResult, Stack, Statement, Unary,
 };
+use cranelift::codegen;
+use cranelift::prelude::*;
+use cranelift_module::{default_libcall_names, DataContext, Linkage, Module};
+use cranelift_object::{ObjectBackend, ObjectBuilder};
+use im::HashMap;
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ErrorRecovery;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use target_lexicon::Triple;
 
 lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
 
 type LalrpopParseError<'input> =
     ErrorRecovery<usize, Token<'input>, &'static str>;
 
-#[derive(Clone, Debug)]
 pub struct Compiler {
-    pub function: Function,
+    function_builder_context: FunctionBuilderContext,
+    codegen_context: codegen::Context,
+    data_context: DataContext,
+    module: Module<ObjectBackend>,
+    environment_stack: Stack<HashMap<String, Variable>>,
 }
 
 impl Compiler {
-    pub fn new() -> Compiler {
+    pub fn new(name: &str) -> Self {
+        let mut flags_builder = cranelift::codegen::settings::builder();
+        flags_builder.enable("is_pic").unwrap();
+        flags_builder.enable("enable_verifier").unwrap();
+        let flags = settings::Flags::new(flags_builder);
+        let isa = codegen::isa::lookup(Triple::host()).unwrap().finish(flags);
+
+        let builder = ObjectBuilder::new(isa, name, default_libcall_names());
+        let module = cranelift_module::Module::new(builder);
+        let mut environment_stack = Stack::new();
+        environment_stack.push(HashMap::new());
+
         Compiler {
-            function: Function::new(0),
+            function_builder_context: FunctionBuilderContext::new(),
+            codegen_context: module.make_context(),
+            data_context: DataContext::new(),
+            module,
+            environment_stack,
         }
     }
 
@@ -36,6 +59,14 @@ impl Compiler {
             } // TODO: Properly convert errors
             Ok(declarations) => self.compile_declarations(&declarations),
         }
+    }
+
+    pub fn finish(self, output: &Path) -> io::Result<()> {
+        let product = self.module.finish();
+        let bytes = product.emit().unwrap();
+        File::create(output)?
+            .write_all(&bytes)
+            .map_err(io::Error::into)
     }
 
     fn parse_source_code<'a>(
@@ -56,282 +87,73 @@ impl Compiler {
         &mut self,
         declarations: &[Declaration],
     ) -> RoxResult<()> {
-        declarations
-            .iter()
-            .for_each(|declaration| match declaration {
-                Declaration::Statement(statement) => self.statement(&statement),
-                Declaration::Variable(identifier, expression) => {
-                    self.variable_declaration(identifier, expression)
-                }
-            });
+        declarations.iter().for_each(|declaration| {
+            self.translate_declaration(declaration).unwrap();
+        });
         Ok(())
     }
 
-    fn current_chunk(&mut self) -> &mut Chunk {
-        self.function.get_chunk()
-    }
-
-    fn emit_byte(&mut self, byte: Byte) {
-        let chunk = self.current_chunk();
-        chunk.push(byte);
-    }
-
-    fn emit_bytes(&mut self, byte_one: Byte, byte_two: Byte) {
-        self.emit_byte(byte_one);
-        self.emit_byte(byte_two);
-    }
-
-    fn emit_constant(&mut self, value: Value) {
-        let constant_index = self.make_constant(value);
-        self.emit_bytes(
-            Byte::Op(OpCode::Constant),
-            Byte::Constant(constant_index),
-        );
-    }
-
-    fn expression(&mut self, expression: &Expression) {
-        match expression {
-            Expression::And(left, right) => self.and_expression(left, right),
-            Expression::Assignment(identifier, expression) => {
-                self.assignment(identifier, expression)
-            }
-            Expression::Boolean(boolean) => self.boolean(boolean),
-            Expression::Number(number) => self.number(number),
-            Expression::Identifier(identifier) => {
-                self.retrieve_variable_value(identifier)
-            }
-            Expression::String(string) => self.string(string),
-            Expression::Operation(left, operation, right) => {
-                self.execute_operation(left, operation, right)
-            }
-            Expression::Or(left, right) => self.or_expression(left, right),
-            Expression::Unary(unary, expression) => {
-                self.unary(unary, expression)
-            }
-            Expression::ParseError => {
-                panic!("Somehow the parse errors got through to execution.")
-            }
-        }
-    }
-
-    fn statement(&mut self, statement: &Statement) {
-        match statement {
-            Statement::Expression(expression) => self.expression(expression),
-            Statement::Print(expression) => self.print_statement(expression),
-            Statement::Return(maybe_expression) => {
-                match maybe_expression {
-                    None => {}
-                    Some(expression) => {
-                        self.expression(expression);
-                    }
-                }
-                self.emit_byte(Byte::Op(OpCode::Return))
-            }
-            Statement::Block(declarations) => {
-                self.emit_byte(Byte::Op(OpCode::ScopeStart));
-                self.compile_declarations(declarations).unwrap();
-                self.emit_byte(Byte::Op(OpCode::ScopeEnd));
-            }
-            Statement::IfElse(dependent, if_block, else_block) => {
-                self.if_statement(dependent, if_block, else_block);
-            }
-            Statement::While(expression, block) => {
-                self.while_statement(expression, block);
-            }
-        }
-    }
-
-    fn make_constant(&mut self, value: Value) -> usize {
-        let chunk = self.current_chunk();
-        chunk.push(value)
-    }
-
-    fn boolean(&mut self, val: &bool) {
-        self.emit_constant(Value::Bool(*val))
-    }
-
-    fn emit_jump(&mut self, op: OpCode) -> usize {
-        self.emit_byte(Byte::Op(op));
-        self.emit_byte(Byte::Op(OpCode::Placeholder));
-        self.current_chunk().codes.len() - 1
-    }
-
-    /// # Control flow
-    /// Control flow in the VM can be a little tough to wrap your head around.
-    /// For some reference, it may be useful to read the
-    /// [section](https://craftinginterpreters.com/jumping-back-and-forth.html#if-statements)
-    /// in "Crafting Interpreters" on them. In short, what we do is emit a placeholder
-    /// byte, parse the body of the block, and then once we finish the block, replace
-    /// the placeholder with the length of the block's instructions.
-    ///
-    /// For example, if we start an if statement at instruction 5, instruction 6 will be a placeholder.
-    /// Then, we will parse a block, say of length 7. We're now at instruction 13, so
-    /// to get the offset we get the length of the block, which is the current instruction location
-    /// minus the location of the placeholder (so here, `13 - 6`), and replace the placeholder
-    /// with that value. We then do essentially the same thing if there's an `else` statement.
-    fn if_statement(
+    pub fn translate_declaration(
         &mut self,
-        dependent_expression: &Expression,
-        if_block: &[Declaration],
-        optional_else_block: &Option<Block>,
-    ) {
-        self.expression(dependent_expression);
-        let if_placeholder_index = self.emit_jump(OpCode::JumpIfFalse);
-        self.emit_byte(Byte::Op(OpCode::Pop));
-        self.compile_declarations(if_block).unwrap();
+        declaration: &Declaration,
+    ) -> RoxResult<()> {
+        match declaration {
+            Declaration::Function(func_name, params, block) => {
+                params.iter().enumerate().for_each(|_| {
+                    // for now, all params will be `Float` types
+                    // TODO: Change this once we get type annotations/inference
+                    self.codegen_context
+                        .func
+                        .signature
+                        .params
+                        .push(AbiParam::new(types::F64));
+                });
 
-        let else_placeholder_index = self.emit_jump(OpCode::Jump);
-        self.patch_jump(if_placeholder_index);
+                let mut builder = FunctionBuilder::new(
+                    &mut self.codegen_context.func,
+                    &mut self.function_builder_context,
+                );
 
-        if let Some(else_block) = optional_else_block {
-            self.compile_declarations(else_block).unwrap()
-        }
-        self.patch_jump(else_placeholder_index);
-        self.emit_byte(Byte::Op(OpCode::Pop));
-    }
+                // Create the block to emit code in, then seal it
+                let entry_block = builder.create_block();
+                builder.append_block_params_for_function_params(entry_block);
+                builder.switch_to_block(entry_block);
+                builder.seal_block(entry_block);
 
-    fn and_expression(
-        &mut self,
-        left_side: &Expression,
-        right_side: &Expression,
-    ) {
-        self.expression(left_side);
-        let end_expression_index = self.emit_jump(OpCode::JumpIfFalse);
-        self.emit_byte(Byte::Op(OpCode::Pop));
-        self.expression(right_side);
-        self.patch_jump(end_expression_index);
-    }
+                let mut index = 0;
+                let mut variables = HashMap::new();
+                let mut func_translator = FunctionTranslator::new(
+                    builder,
+                    &mut variables,
+                    &mut self.module,
+                    &mut index,
+                );
+                block.iter().for_each(|statement| {
+                    func_translator.translate_statement(statement);
+                });
 
-    fn or_expression(
-        &mut self,
-        left_side: &Expression,
-        right_side: &Expression,
-    ) {
-        self.expression(left_side);
-        let else_jump_index = self.emit_jump(OpCode::JumpIfFalse);
-        let end_jump = self.emit_jump(OpCode::Jump);
+                func_translator.builder.ins().return_(&[]);
+                func_translator.finalize();
 
-        self.patch_jump(else_jump_index);
-        self.emit_byte(Byte::Op(OpCode::Pop));
-
-        self.expression(right_side);
-
-        self.patch_jump(end_jump);
-    }
-
-    fn while_statement(
-        &mut self,
-        expression: &Expression,
-        block: &[Declaration],
-    ) {
-        let loop_start_index = self.current_chunk().codes.len();
-        self.expression(expression);
-
-        let end_jump_index = self.emit_jump(OpCode::JumpIfFalse);
-        self.emit_byte(Byte::Op(OpCode::Pop));
-        self.compile_declarations(block).unwrap();
-
-        self.emit_loop(loop_start_index);
-        self.patch_jump(end_jump_index);
-        self.emit_byte(Byte::Op(OpCode::Pop));
-    }
-
-    fn emit_loop(&mut self, loop_start_index: usize) {
-        self.emit_byte(Byte::Op(OpCode::Loop));
-        let offset = self.current_chunk().codes.len() - loop_start_index + 1;
-
-        self.emit_byte(Byte::Op(OpCode::OpLocation(offset)));
-    }
-
-    fn patch_jump(&mut self, offset: usize) {
-        let current_location = self.current_chunk().codes.len();
-        self.current_chunk().codes[offset] =
-            Byte::Op(OpCode::OpLocation(current_location - offset));
-    }
-
-    fn number(&mut self, number: &f64) {
-        let value = Value::Float(*number);
-        self.emit_constant(value);
-    }
-
-    fn execute_operation(
-        &mut self,
-        left: &Expression,
-        operation: &Operation,
-        right: &Expression,
-    ) {
-        // The order of these is important so that they are popped off the stack in order
-        self.expression(right);
-        self.expression(left);
-
-        match operation {
-            Operation::Equals => self.emit_byte(Byte::Op(OpCode::Equal)),
-            Operation::NotEquals => self.emit_byte(Byte::Op(OpCode::NotEquals)),
-            Operation::Add => self.emit_byte(Byte::Op(OpCode::Add)),
-            Operation::Subtract => self.emit_byte(Byte::Op(OpCode::Subtract)),
-            Operation::Multiply => self.emit_byte(Byte::Op(OpCode::Multiply)),
-            Operation::Divide => self.emit_byte(Byte::Op(OpCode::Divide)),
-            Operation::Modulo => self.emit_byte(Byte::Op(OpCode::Modulo)),
-            Operation::GreaterThan => {
-                self.emit_byte(Byte::Op(OpCode::GreaterThan))
+                let id = self
+                    .module
+                    .declare_function(
+                        &func_name,
+                        Linkage::Export,
+                        &self.codegen_context.func.signature,
+                    )
+                    .unwrap();
+                self.module
+                    .define_function(
+                        id,
+                        &mut self.codegen_context,
+                        &mut codegen::binemit::NullTrapSink {},
+                    )
+                    .unwrap();
+                self.module.clear_context(&mut self.codegen_context);
+                self.module.finalize_definitions();
+                Ok(())
             }
-            Operation::LessThan => self.emit_byte(Byte::Op(OpCode::LessThan)),
-        }
-    }
-
-    fn assignment(&mut self, identifier: &str, expression: &Expression) {
-        let identifier_constant = self.identifier_constant(identifier);
-        self.expression(expression);
-        self.emit_bytes(
-            Byte::Constant(identifier_constant),
-            Byte::Op(OpCode::SetVariable),
-        )
-    }
-
-    fn string(&mut self, string: &str) {
-        let val = Value::create_string(string.to_string());
-        self.emit_constant(val)
-    }
-
-    fn print_statement(&mut self, expression: &Expression) {
-        self.expression(expression);
-        self.emit_byte(Byte::Op(OpCode::Print))
-    }
-
-    fn variable_declaration(
-        &mut self,
-        identifier: &str,
-        expression: &Expression,
-    ) {
-        self.expression(expression);
-        let variable_constant = self.identifier_constant(identifier);
-        self.define_variable(variable_constant);
-    }
-
-    fn define_variable(&mut self, variable_constant: usize) {
-        self.emit_bytes(
-            Byte::Constant(variable_constant),
-            Byte::Op(OpCode::DefineVariable),
-        );
-    }
-
-    fn retrieve_variable_value(&mut self, identifier: &str) {
-        let identifier_constant = self.identifier_constant(identifier);
-        self.emit_bytes(
-            Byte::Constant(identifier_constant),
-            Byte::Op(OpCode::GetVariable),
-        )
-    }
-
-    fn identifier_constant(&mut self, identifier_text: &str) -> usize {
-        self.make_constant(Value::create_string(String::from(identifier_text)))
-    }
-
-    fn unary(&mut self, unary: &Unary, expression: &Expression) {
-        self.expression(expression);
-        match unary {
-            Unary::Not => self.emit_byte(Byte::Op(OpCode::Not)),
-            Unary::Negate => self.emit_byte(Byte::Op(OpCode::Negate)),
         }
     }
 }

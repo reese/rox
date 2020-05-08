@@ -30,9 +30,13 @@ harness = false
 lalrpop = { version = "0.18.1", features = ["lexer"] }
 
 [dependencies]
+cranelift = "0.63"
+cranelift-module = "0.63"
+cranelift-object = "0.63"
 im = "14.3.0"
 lalrpop-util = "0.18.1"
 regex = "1"
+target-lexicon = "0.10.0"
 
 [dev-dependencies]
 criterion = "0.3.2"

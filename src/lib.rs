@@ -14,8 +14,8 @@ extern crate lalrpop_util;
 
 mod interpreter;
 
-pub use interpreter::Value;
-use interpreter::{InterpretError, InterpretErrorType, RoxResult, VM};
+use crate::interpreter::Compiler;
+use interpreter::{InterpretError, InterpretErrorType, RoxResult};
 use std::fs;
 use std::path::Path;
 use std::process::exit;
@@ -80,6 +80,9 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
 
 /// The `interpret` function runs the given source code (as a `&str`)
 /// through the interpreter and returns the resulting value.
-pub fn interpret(input: &str) -> RoxResult<Value> {
-    VM::new().interpret(input)
+pub fn interpret(input: &str) -> RoxResult<()> {
+    let mut compiler = Compiler::new("test.o");
+    compiler.compile(input).unwrap();
+    compiler.finish(Path::new("test.o")).unwrap();
+    Ok(())
 }

@@ -5,17 +5,17 @@ use lalrpop_util::ErrorRecovery;
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
 
 pub Program: Vec<Declaration> = {
-    <(<Declaration>)*>
+    <(<FunctionDeclaration>)*>
 }
 
-Declaration: Declaration = {
-    <Statement> => Declaration::Statement(<>),
-    "let" <Identifier> "=" <TopExpression> ";" => Declaration::Variable(<>),
+FunctionDeclaration: Declaration = {
+    "let" <Identifier> "=" "fn" "(" <Params> ")" <Block> => Declaration::Function(<>),
 }
 
 Statement: Box<Statement> = {
     <TopExpression> ";" => Box::new(Statement::Expression(<>)),
     <Block> => Box::new(Statement::Block(<>)),
+    "let" <Identifier> "=" <LogicOr> ";" => Box::new(Statement::Variable(<>)),
     "if" <TopExpression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
     "while" <LogicOr> <Block> => Box::new(Statement::While(<>)),
     "print" <TopExpression> ";" => Box::new(Statement::Print(<>)),
@@ -30,7 +30,7 @@ TopExpression: Box<Expression> = {
 }
 
 Block: Block = {
-    "{" <(<Declaration>)*> "}",
+    "{" <(<Statement>)*> "}",
 }
 
 Assignment: Box<Expression> = {
@@ -52,11 +52,26 @@ Expression: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
     Expression ExpressionOp Factor => Box::new(Expression::Operation(<>)),
     Factor,
+    <Identifier> "(" <(Arguments)?> ")" => Box::new(Expression::FunctionCall(<>)),
     ! => {
         errors.push(<>);
         Box::new(Expression::ParseError)
     }
 };
+
+Params: Vec<String> = {
+    <first:Identifier> <mut rest: ("," <Identifier>)*> ","? => {
+        rest.insert(0, first);
+        rest
+    }
+}
+
+Arguments: Vec<Box<Expression>> = {
+    <first:TopExpression> <mut rest: ("," <TopExpression>)*> ","? => {
+        rest.insert(0, first);
+        rest
+    }
+}
 
 Factor: Box<Expression> = {
     Factor FactorOp Term => Box::new(Expression::Operation(<>)),
@@ -78,7 +93,6 @@ ComparisonOp: Operation = {
 FactorOp: Operation = {
     "*" => Operation::Multiply,
     "/" => Operation::Divide,
-    "%" => Operation::Modulo,
 };
 
 ExpressionOp: Operation = {

@@ -8,6 +8,10 @@ impl<T> Stack<T> {
         Stack { stack: Vec::new() }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
     pub fn push(&mut self, item: T) {
         self.stack.push(item);
     }
@@ -18,9 +22,5 @@ impl<T> Stack<T> {
 
     pub fn top(&self) -> &T {
         self.stack.last().expect("No items on stack")
-    }
-
-    pub fn top_mut(&mut self) -> &mut T {
-        self.stack.last_mut().expect("No items on stack")
     }
 }
