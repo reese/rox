@@ -23,4 +23,8 @@ impl<T> Stack<T> {
     pub fn top(&self) -> &T {
         self.stack.last().expect("No items on stack")
     }
+
+    pub fn top_mut(&mut self) -> &mut T {
+        self.stack.last_mut().expect("No items on stack")
+    }
 }

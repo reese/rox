@@ -6,8 +6,9 @@
     html_favicon_url = "https://github.com/reese/rox/raw/master/assets/favicon.png"
 )]
 //! # Rox
-//! `Rox` is based on the `Lox` language implemented in Bob Nystrom's
-//! series, "Crafting Interpreters."
+//! `Rox` is high-level, statically-typed, compiled language that mixes
+//! the familiarity of C-style syntax with the rigorous and expressive features
+//! of functional languages.
 
 #[macro_use]
 extern crate lalrpop_util;
@@ -51,8 +52,7 @@ macro_rules! rox {
 ///
 /// # Errors
 /// Currently, the Rox roxc exits with a
-/// `1` error code if it fails during compilation
-/// and a `2` if it fails at runtime. In the future,
+/// `1` error code if it fails to compile. In the future,
 /// it would likely be a good idea to refactor these
 /// to have POSIX compliant error codes, or at least
 /// some consistent error code system.
@@ -64,11 +64,6 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
             if error_type == InterpretErrorType::InterpretCompileError =>
         {
             exit(1)
-        }
-        Err(InterpretError { error_type, .. })
-            if error_type == InterpretErrorType::InterpretRuntimeError =>
-        {
-            exit(2)
         }
         Err(_) => exit(1),
         Ok(val) => {

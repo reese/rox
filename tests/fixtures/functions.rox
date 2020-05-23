@@ -1,10 +1,9 @@
-let test = fn(number: int) {
-    while number < 10 {
-        print number;
-        number = number + 1;
-    }
+fn test () {
+    4 + 5;
 }
 
-let main = fn () {
+fn main () {
     test();
+    1+2;
+    1.1 + 2.4;
 }

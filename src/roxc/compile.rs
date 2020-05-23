@@ -1,16 +1,18 @@
 use std::{io, str};
 
 use crate::roxc::{
-    Declaration, Expression, FunctionTranslator, InterpretError, Operation,
-    RoxResult, Stack, Statement, Unary,
+    get_type_from_name, Declaration, FunctionTranslator, InterpretError,
+    RoxResult, Stack, Statement,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
+use cranelift_codegen::isa::CallConv;
 use cranelift_module::{default_libcall_names, DataContext, Linkage, Module};
 use cranelift_object::{ObjectBackend, ObjectBuilder};
 use im::HashMap;
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ErrorRecovery;
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -23,7 +25,6 @@ type LalrpopParseError<'input> =
 
 pub struct Compiler {
     function_builder_context: FunctionBuilderContext,
-    codegen_context: codegen::Context,
     data_context: DataContext,
     module: Module<ObjectBackend>,
     environment_stack: Stack<HashMap<String, Variable>>,
@@ -44,7 +45,6 @@ impl Compiler {
 
         Compiler {
             function_builder_context: FunctionBuilderContext::new(),
-            codegen_context: module.make_context(),
             data_context: DataContext::new(),
             module,
             environment_stack,
@@ -98,59 +98,60 @@ impl Compiler {
         declaration: &Declaration,
     ) -> RoxResult<()> {
         match declaration {
-            Declaration::Function(func_name, params, block) => {
-                params.iter().enumerate().for_each(|_| {
-                    // for now, all params will be `Float` types
-                    // TODO: Change this once we get type annotations/inference
-                    self.codegen_context
-                        .func
-                        .signature
-                        .params
-                        .push(AbiParam::new(types::F64));
-                });
+            Declaration::Function(func_declaration) => {
+                let mut codegen_context = self.module.make_context();
+                match func_declaration.borrow() {
+                    Statement::FunctionDeclaration(
+                        func_name,
+                        params,
+                        return_type,
+                        block,
+                    ) => {
+                        let mut signature = Signature::new(CallConv::SystemV);
+                        params.iter().for_each(|(_, type_str)| {
+                            let codegen_type = get_type_from_name(type_str);
+                            signature.params.push(AbiParam::new(codegen_type));
+                        });
 
-                let mut builder = FunctionBuilder::new(
-                    &mut self.codegen_context.func,
-                    &mut self.function_builder_context,
-                );
+                        codegen_context.func.name = func_name.parse().unwrap();
+                        codegen_context.func.signature = signature;
 
-                // Create the block to emit code in, then seal it
-                let entry_block = builder.create_block();
-                builder.append_block_params_for_function_params(entry_block);
-                builder.switch_to_block(entry_block);
-                builder.seal_block(entry_block);
+                        let mut builder = FunctionBuilder::new(
+                            &mut codegen_context.func,
+                            &mut self.function_builder_context,
+                        );
+                        let mut function_translator = FunctionTranslator::new(
+                            &mut builder,
+                            &mut self.environment_stack,
+                            &mut self.module,
+                        );
 
-                let mut index = 0;
-                let mut variables = HashMap::new();
-                let mut func_translator = FunctionTranslator::new(
-                    builder,
-                    &mut variables,
-                    &mut self.module,
-                    &mut index,
-                );
-                block.iter().for_each(|statement| {
-                    func_translator.translate_statement(statement);
-                });
+                        function_translator.translate_function(
+                            params,
+                            return_type,
+                            block,
+                        );
 
-                func_translator.builder.ins().return_(&[]);
-                func_translator.finalize();
-
-                let id = self
-                    .module
-                    .declare_function(
-                        &func_name,
-                        Linkage::Export,
-                        &self.codegen_context.func.signature,
-                    )
-                    .unwrap();
-                self.module
-                    .define_function(
-                        id,
-                        &mut self.codegen_context,
-                        &mut codegen::binemit::NullTrapSink {},
-                    )
-                    .unwrap();
-                self.module.clear_context(&mut self.codegen_context);
+                        let func = self
+                            .module
+                            .declare_function(
+                                func_name,
+                                Linkage::Export,
+                                &codegen_context.func.signature,
+                            )
+                            .unwrap();
+                        self.module
+                            .define_function(
+                                func,
+                                &mut codegen_context,
+                                &mut codegen::binemit::NullTrapSink {},
+                            )
+                            .unwrap();
+                        self.module.clear_context(&mut codegen_context);
+                    }
+                    _ => unreachable!(),
+                };
+                self.module.clear_context(&mut codegen_context);
                 self.module.finalize_definitions();
                 Ok(())
             }

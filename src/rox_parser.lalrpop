@@ -1,63 +1,99 @@
-use crate::roxc::{Block, Declaration, Expression, Operation, Statement, Param, Type, Unary};
+use crate::roxc::{Block, Declaration, Expression, Operation, Param, Statement, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
 
 pub Program: Vec<Declaration> = {
-    <(<FunctionDeclaration>)*>
+    <(<TopLevelFunctionDeclaration>)*>
 }
 
-FunctionDeclaration: Declaration = {
-    "let" <Identifier> "=" "fn" "(" <Params> ")" <Block> => Declaration::Function(<>),
+TopLevelFunctionDeclaration: Declaration = {
+    <Function> => Declaration::Function(<>),
 }
 
-Statement: Box<Statement> = {
-    <TopExpression> ";" => Box::new(Statement::Expression(<>)),
-    <Block> => Box::new(Statement::Block(<>)),
-    "let" <Identifier> "=" <LogicOr> ";" => Box::new(Statement::Variable(<>)),
-    "if" <TopExpression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
-    "while" <LogicOr> <Block> => Box::new(Statement::While(<>)),
-    "print" <TopExpression> ";" => Box::new(Statement::Print(<>)),
-    "return" <e:TopExpression?> ";" => match e {
-        None => Box::new(Statement::Return(None)),
-        Some(e) => Box::new(Statement::Return(Some(e))),
-    }
-};
-
-TopExpression: Box<Expression> = {
-    <Assignment>
+Function: Box<Statement> = {
+    "fn" <Identifier> "(" <Params> ")" <(ReturnType)?> <Block> => Box::new(Statement::FunctionDeclaration(<>))
 }
 
 Block: Block = {
     "{" <(<Statement>)*> "}",
 }
 
-Assignment: Box<Expression> = {
-    <Identifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
-    <LogicOr>
+Statement: Box<Statement> = {
+    <Expression> ";" => Box::new(Statement::Expression(<>)),
+    <ReturnStatement>,
+    <Function> ";",
+    <Block> ";" => Box::new(Statement::Block(<>)),
 }
 
-LogicOr: Box<Expression> = {
-    <Expression> "or" <Expression> => Box::new(Expression::Or(<>)),
-    <LogicAnd>
-}
-
-LogicAnd: Box<Expression> = {
-    <Expression> "and" <Expression> => Box::new(Expression::And(<>)),
-    <Expression>
+ReturnStatement: Box<Statement> = {
+    "return" <Expression> ";" => Box::new(Statement::Return(Some(<>))),
+    "return" ";" => Box::new(Statement::Return(None)),
 }
 
 Expression: Box<Expression> = {
-    Boolean => Box::new(Expression::Boolean(<>)),
-    Expression ExpressionOp Factor => Box::new(Expression::Operation(<>)),
-    Factor,
-    <Identifier> "(" <(Arguments)?> ")" => Box::new(Expression::FunctionCall(<>)),
-    ! => {
-        errors.push(<>);
-        Box::new(Expression::ParseError)
-    }
+    Assignment
+}
+
+Assignment: Box<Expression> = {
+    // TODO: Allow for assignment to function results
+    // TODO: i.e. `some_call().attribute = 3;`
+    <Identifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
+    "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
+    LogicOr
+}
+
+LogicOr: Box<Expression> = {
+    <LogicAnd> "or" <LogicAnd> => Box::new(Expression::Or(<>)),
+    LogicAnd
+}
+
+LogicAnd: Box<Expression> = {
+    <Equality> "and" <Equality> => Box::new(Expression::And(<>)),
+    Equality
+}
+
+Equality: Box<Expression> = {
+    Comparison EqualityOp Comparison => Box::new(Expression::Operation(<>)),
+    Comparison
+}
+
+Comparison: Box<Expression> = {
+    Addition ComparisonOp Addition => Box::new(Expression::Operation(<>)),
+    Addition
+}
+
+Addition: Box<Expression> = {
+    Multiplication AdditionOp Multiplication => Box::new(Expression::Operation(<>)),
+    Multiplication
+}
+
+Multiplication: Box<Expression> = {
+    Unary MultiplicationOp Unary => Box::new(Expression::Operation(<>)),
+    Unary
+}
+
+Unary: Box<Expression> = {
+    "!" <Unary> => Box::new(Expression::Unary(Unary::Not, <>)),
+    "-" <Unary> => Box::new(Expression::Unary(Unary::Negate, <>)),
+    Call,
 };
+
+Call: Box<Expression> = {
+    <i: Identifier> "(" <args: (Arguments)?> ")" => Box::new(Expression::FunctionCall(i, args.unwrap_or(Vec::new()))),
+    Primary
+}
+
+ComparisonOp: Operation = {
+    ">" => Operation::GreaterThan,
+    "<" => Operation::LessThan,
+}
+
+EqualityOp: Operation = {
+    "==" => Operation::Equals,
+    "!=" => Operation::NotEquals,
+}
 
 Params: Vec<Param> = {
     <first:(Param)?> <mut rest: ("," <Param>)*> ","? => {
@@ -72,51 +108,37 @@ Param: Param = {
     <i:Identifier> ":" <t:Identifier> => (i, t)
 }
 
+ReturnType: String = {
+    "->" <Identifier>
+}
+
 Arguments: Vec<Box<Expression>> = {
-    <first:TopExpression> <mut rest: ("," <TopExpression>)*> ","? => {
-        rest.insert(0, first);
-        rest
-    }
+    <mut args:Arguments> "," <expr:Expression> => {
+        args.push(expr);
+        args
+    },
+    <Expression> => vec!(<>),
 }
 
-Factor: Box<Expression> = {
-    Factor FactorOp Term => Box::new(Expression::Operation(<>)),
-    Term,
-    Comparison,
-};
-
-Comparison: Box<Expression> = {
-    Factor ComparisonOp Term => Box::new(Expression::Operation(<>))
-}
-
-ComparisonOp: Operation = {
-    ">" => Operation::GreaterThan,
-    "<" => Operation::LessThan,
-    "==" => Operation::Equals,
-    "!=" => Operation::NotEquals,
-}
-
-FactorOp: Operation = {
+MultiplicationOp: Operation = {
     "*" => Operation::Multiply,
     "/" => Operation::Divide,
 };
 
-ExpressionOp: Operation = {
+AdditionOp: Operation = {
     "+" => Operation::Add,
     "-" => Operation::Subtract,
 };
 
-Term: Box<Expression> = {
+Primary: Box<Expression> = {
+    Boolean => Box::new(Expression::Boolean(<>)),
     Num => Box::new(Expression::Number(<>)),
-    Identifier => Box::new(Expression::Identifier(<>)),
     String => Box::new(Expression::String(<>)),
-    Unary Term => Box::new(Expression::Unary(<>)),
-    "(" <Expression> ")"
-};
-
-Unary: Unary = {
-    "!" => Unary::Not,
-    "-" => Unary::Negate,
+    "(" <Expression> ")",
+    ! => {
+        errors.push(<>);
+        Box::new(Expression::ParseError)
+    }
 };
 
 Boolean: bool = {
