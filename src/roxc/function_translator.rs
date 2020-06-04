@@ -1,4 +1,4 @@
-use crate::roxc::{Expression, Operation, Param, RoxType, Stack, Statement};
+use crate::roxc::{syntax, Expression, Param, RoxType, Stack, Statement};
 use cranelift::prelude::*;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectBackend;
@@ -50,12 +50,6 @@ impl<'func> FunctionTranslator<'func> {
             Statement::Expression(expression) => {
                 self.translate_expression(expression);
             }
-            Statement::Variable(variable_name, expression) => {
-                let value = self.translate_expression(expression);
-                let variable = Variable::new(self.variables.top().len());
-                self.builder.declare_var(variable, types::F64); // TODO: Pass expression type from semantic type
-                self.builder.def_var(variable, value[0]);
-            }
             Statement::FunctionDeclaration(..) => {
                 panic!("For right now, functions can only be declared at the top level.")
             }
@@ -67,11 +61,10 @@ impl<'func> FunctionTranslator<'func> {
         &mut self,
         expression: &Expression,
     ) -> Vec<Value> {
+        use Expression::*;
         match expression {
-            Expression::Boolean(bool) => {
-                vec![self.builder.ins().bconst(types::B1, *bool)]
-            }
-            Expression::FunctionCall(function_name, args) => {
+            Boolean(bool) => vec![self.builder.ins().bconst(types::B1, *bool)],
+            FunctionCall(function_name, args) => {
                 // TODO: Determine function types in semantics pass
                 // Functions need to know (1) name, (2) arg types, and (3) return type(s)
                 let mut signature = self.module.make_signature();
@@ -101,27 +94,28 @@ impl<'func> FunctionTranslator<'func> {
                 Vec::new()
                 // builder.inst_results(call)[0] // TODO: Support multiple returns
             }
-            Expression::Number(num) => vec![self.builder.ins().f64const(*num)],
-            Expression::Identifier(name) => {
+            Number(num) => vec![self.builder.ins().f64const(*num)],
+            Identifier(name) => {
                 let variables = self.variables.top();
                 let variable =
                     variables.get(name).expect("Variable not defined");
                 vec![self.builder.use_var(*variable)]
             }
-            Expression::Operation(left, operation, right) => {
+            Operation(left, operation, right) => {
+                use syntax::Operation::*;
                 let lval = self.translate_expression(left)[0];
                 let rval = self.translate_expression(right)[0];
                 let result = match operation {
-                    Operation::Add => self.builder.ins().fadd(lval, rval),
-                    Operation::Subtract => self.builder.ins().fsub(lval, rval),
-                    Operation::Multiply => self.builder.ins().fmul(lval, rval),
-                    Operation::Divide => self.builder.ins().fdiv(lval, rval),
-                    Operation::Equals => {
+                    Add => self.builder.ins().fadd(lval, rval),
+                    Subtract => self.builder.ins().fsub(lval, rval),
+                    Multiply => self.builder.ins().fmul(lval, rval),
+                    Divide => self.builder.ins().fdiv(lval, rval),
+                    Equals => {
                         let bool =
                             self.builder.ins().fcmp(FloatCC::Equal, lval, rval);
                         self.builder.ins().bint(types::B1, bool)
                     }
-                    Operation::NotEquals => {
+                    NotEquals => {
                         let bool = self.builder.ins().fcmp(
                             FloatCC::NotEqual,
                             lval,
@@ -129,7 +123,7 @@ impl<'func> FunctionTranslator<'func> {
                         );
                         self.builder.ins().bint(types::B1, bool)
                     }
-                    Operation::GreaterThan => {
+                    GreaterThan => {
                         let bool = self.builder.ins().fcmp(
                             FloatCC::GreaterThan,
                             lval,
@@ -137,7 +131,7 @@ impl<'func> FunctionTranslator<'func> {
                         );
                         self.builder.ins().bint(types::B1, bool)
                     }
-                    Operation::LessThan => {
+                    LessThan => {
                         let bool = self.builder.ins().fcmp(
                             FloatCC::LessThan,
                             lval,

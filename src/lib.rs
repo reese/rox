@@ -12,11 +12,13 @@
 
 #[macro_use]
 extern crate lalrpop_util;
+#[macro_use]
+extern crate lazy_static;
 
 mod roxc;
 
 use crate::roxc::Compiler;
-use roxc::{InterpretError, InterpretErrorType, RoxResult};
+use roxc::{RoxError, RoxErrorType, RoxResult};
 use std::fs;
 use std::path::Path;
 use std::process::exit;
@@ -60,8 +62,8 @@ pub fn run_file(path: &Path) -> std::io::Result<()> {
     let source = fs::read_to_string(path)?;
     let result = interpret(&source);
     match result {
-        Err(InterpretError { error_type, .. })
-            if error_type == InterpretErrorType::InterpretCompileError =>
+        Err(RoxError { error_type, .. })
+            if error_type == RoxErrorType::CompileError =>
         {
             exit(1)
         }

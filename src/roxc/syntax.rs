@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expression {
     And(Box<Expression>, Box<Expression>),
     Assignment(String, Box<Expression>),
@@ -19,7 +19,7 @@ pub enum Expression {
 pub type Block = Vec<Box<Statement>>;
 pub type Param = (String, String);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Operation {
     Equals,
     NotEquals,
@@ -33,7 +33,7 @@ pub enum Operation {
     Divide,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Unary {
     Not,
     Negate,
@@ -44,16 +44,16 @@ pub enum RoxType {
     Int,
     Float,
     String,
-    UserType(String),
+    // TODO: Support user-defined types
+    // UserType(String),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Statement {
     Expression(Box<Expression>),
     Return(Option<Box<Expression>>),
     Block(Block),
     FunctionDeclaration(String, Vec<Param>, Option<String>, Block),
-    Variable(String, Box<Expression>),
 }
 
 #[derive(Debug)]

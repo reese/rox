@@ -1,8 +1,8 @@
 use std::{io, str};
 
 use crate::roxc::{
-    get_type_from_name, Declaration, FunctionTranslator, InterpretError,
-    RoxResult, Stack, Statement,
+    get_type_from_name, Declaration, FunctionTranslator, RoxError, RoxResult,
+    Stack, Statement,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
@@ -55,7 +55,7 @@ impl Compiler {
         match self.parse_source_code(source) {
             Err(errors) => {
                 println!("{:?}", errors);
-                InterpretError::compile_error()
+                RoxError::compile_error()
             } // TODO: Properly convert errors
             Ok(declarations) => self.compile_declarations(&declarations),
         }
