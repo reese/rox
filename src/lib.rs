@@ -12,8 +12,6 @@
 
 #[macro_use]
 extern crate lalrpop_util;
-#[macro_use]
-extern crate lazy_static;
 
 mod roxc;
 
@@ -22,32 +20,6 @@ use roxc::{RoxError, RoxErrorType, RoxResult};
 use std::fs;
 use std::path::Path;
 use std::process::exit;
-
-/// # `Rox` macro
-/// The `rox!` macro allows you to embed `rox` directly
-/// into your Rust applications.
-///
-/// ```
-/// # #[macro_use]
-/// # extern crate rox;
-/// # fn main() {
-/// let result = rox! {
-///     let x = 4;
-///     while x < 10 {
-///         print x;
-///         x = x + 1;
-///     }
-///     return x;
-/// };
-/// assert!(result.is_ok())
-/// # }
-/// ```
-#[macro_export]
-macro_rules! rox {
-    ($ ($ t : tt) *) => {
-        rox::interpret(stringify!($($t)*));
-    };
-}
 
 /// `run_file` reads the contents of the given path
 /// and runs them through the roxc.

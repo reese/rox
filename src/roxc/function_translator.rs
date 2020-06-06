@@ -149,7 +149,7 @@ impl<'func> FunctionTranslator<'func> {
         }
     }
 
-    fn initialize_block(&mut self, params: &[(String, String)]) {
+    fn initialize_block(&mut self, params: &[Param]) {
         let entry_block = self.builder.create_block();
         self.builder
             .append_block_params_for_function_params(entry_block);

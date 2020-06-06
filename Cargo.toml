@@ -36,7 +36,6 @@ cranelift-module = "0.63"
 cranelift-object = "0.63"
 im = "14.3.0"
 lalrpop-util = "0.18.1"
-lazy_static = "1.4.0"
 regex = "1"
 target-lexicon = "0.10.0"
 

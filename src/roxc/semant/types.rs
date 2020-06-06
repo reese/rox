@@ -1,23 +1,5 @@
-use crate::roxc::{Expression, RoxType};
+use crate::roxc::RoxType;
 use std::collections::HashMap;
-
-#[derive(Clone)]
-pub enum Syntax {
-    Function {
-        name: String,
-        body: Box<Syntax>,
-    },
-    Identifier {
-        name: String,
-    },
-    Apply {
-        function: Box<Syntax>,
-        arg: Box<Syntax>,
-    },
-    Literal {
-        value: Box<Expression>,
-    },
-}
 
 pub type ArenaType = usize;
 
@@ -27,10 +9,11 @@ pub enum Type {
         id: ArenaType,
         instance: Option<ArenaType>,
     },
-    Operator {
+    Function {
         id: ArenaType,
         name: String,
-        types: Vec<ArenaType>,
+        arg_types: Vec<ArenaType>,
+        return_types: Vec<ArenaType>,
     },
 }
 
@@ -63,22 +46,24 @@ impl Type {
         Type::Variable { id, instance: None }
     }
 
-    pub fn new_operator(
+    pub fn new_function(
         id: ArenaType,
         name: &str,
-        types: &[ArenaType],
+        arg_types: &[ArenaType],
+        return_types: &[ArenaType],
     ) -> Type {
-        Type::Operator {
+        Type::Function {
             id,
             name: name.to_string(),
-            types: types.to_vec(),
+            arg_types: arg_types.to_vec(),
+            return_types: return_types.to_vec(),
         }
     }
 
     fn get_id(&self) -> usize {
         match self {
             &Type::Variable { id, .. } => id,
-            &Type::Operator { id, .. } => id,
+            &Type::Function { id, .. } => id,
         }
     }
 
@@ -94,10 +79,10 @@ impl Type {
 
 pub fn new_function(
     types: &mut Vec<Type>,
-    from_type: ArenaType,
-    to_type: ArenaType,
+    from_type: &[ArenaType],
+    to_type: &[ArenaType],
 ) -> ArenaType {
-    let type_ = Type::new_operator(types.len(), "->", &[from_type, to_type]);
+    let type_ = Type::new_function(types.len(), "->", from_type, to_type);
     types.push(type_);
     types.len() - 1
 }
@@ -106,14 +91,4 @@ pub fn new_variable(types: &mut Vec<Type>) -> ArenaType {
     let type_ = Type::new_variable(types.len());
     types.push(type_);
     types.len() - 1
-}
-
-pub fn new_operator(
-    a: &mut Vec<Type>,
-    name: &str,
-    types: &[ArenaType],
-) -> ArenaType {
-    let t = Type::new_operator(a.len(), name, types);
-    a.push(t);
-    a.len() - 1
 }

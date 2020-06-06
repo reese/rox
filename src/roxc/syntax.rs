@@ -10,8 +10,6 @@ pub enum Expression {
     Or(Box<Expression>, Box<Expression>),
     String(String),
     Unary(Unary, Box<Expression>),
-    Print(Box<Expression>),
-    IfElse(Box<Expression>, Block, Option<Block>),
     Variable(String, Box<Expression>),
     ParseError,
 }
@@ -53,11 +51,13 @@ pub enum Statement {
     Expression(Box<Expression>),
     Return(Option<Box<Expression>>),
     Block(Block),
+    IfElse(Box<Expression>, Block, Option<Block>),
     FunctionDeclaration(String, Vec<Param>, Option<String>, Block),
 }
 
 #[derive(Debug)]
 pub enum Declaration {
+    // TODO: Allow user defined types
     // Record(Vec<Field>),
     Function(Box<Statement>),
 }

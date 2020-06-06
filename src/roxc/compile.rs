@@ -1,8 +1,8 @@
 use std::{io, str};
 
 use crate::roxc::{
-    get_type_from_name, Declaration, FunctionTranslator, RoxError, RoxResult,
-    Stack, Statement,
+    analyse_program, get_builtin_types, get_type_from_name, Declaration,
+    FunctionTranslator, RoxError, RoxResult, Stack, Statement,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
@@ -87,6 +87,7 @@ impl Compiler {
         &mut self,
         declarations: &[Declaration],
     ) -> RoxResult<()> {
+        analyse_program(declarations);
         declarations.iter().for_each(|declaration| {
             self.translate_declaration(declaration).unwrap();
         });

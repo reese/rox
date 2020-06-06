@@ -1,6 +1,6 @@
 use std::error::Error;
+use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::{fmt, io};
 
 pub type RoxResult<T> = std::result::Result<T, RoxError>;
 
