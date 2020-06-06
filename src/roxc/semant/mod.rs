@@ -28,7 +28,7 @@ pub static STRING_TYPE_VAL: ArenaType = 2;
 
 type Env = HashMap<String, ArenaType>;
 
-pub fn get_builtin_types() -> Vec<Type> {
+fn get_builtin_types() -> Vec<Type> {
     let initial_types = vec![NUMBER_TYPE_VAL, BOOL_TYPE_VAL, STRING_TYPE_VAL];
     initial_types
         .iter()
@@ -52,7 +52,7 @@ pub fn analyse_program(declarations: &[Declaration]) {
         })
 }
 
-pub fn analyse_statement(
+fn analyse_statement(
     types: &mut Vec<Type>,
     node: Statement,
     env: &mut Env,
@@ -127,7 +127,7 @@ pub fn analyse_statement(
     }
 }
 
-pub fn analyse_expression(
+fn analyse_expression(
     types: &mut Vec<Type>,
     node: Box<Expression>,
     env: &mut Env,

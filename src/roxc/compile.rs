@@ -1,8 +1,8 @@
 use std::{io, str};
 
 use crate::roxc::{
-    analyse_program, get_builtin_types, get_type_from_name, Declaration,
-    FunctionTranslator, RoxError, RoxResult, Stack, Statement,
+    analyse_program, get_type_from_name, Declaration, FunctionTranslator,
+    RoxError, RoxResult, Stack, Statement,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
