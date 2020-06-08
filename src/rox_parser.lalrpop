@@ -38,7 +38,7 @@ Expression: Box<Expression> = {
 
 Assignment: Box<Expression> = {
     // TODO: Allow for assignment to function results
-    // TODO: i.e. `some_call().attribute = 3;`
+    // i.e. `some_call().attribute = 3;`
     <Identifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
     "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
     LogicOr
@@ -134,6 +134,7 @@ Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
     Num => Box::new(Expression::Number(<>)),
     String => Box::new(Expression::String(<>)),
+    Identifier => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
     ! => {
         errors.push(<>);
@@ -147,7 +148,7 @@ Boolean: bool = {
 }
 
 Identifier: String = {
-    r"[a-zA-Z_]([a-zA-Z0-9_])*" => String::from(<>)
+    r"[a-zA-Z_]([a-zA-Z0-9_?!-])*" => String::from(<>)
 }
 
 Num: f64 = {

@@ -39,11 +39,18 @@ pub enum Unary {
 
 #[derive(Debug)]
 pub enum RoxType {
-    Int,
-    Float,
+    Bool,
+    Number,
     String,
     // TODO: Support user-defined types
     // UserType(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionDeclaration {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub return_type: Option<String>,
 }
 
 #[derive(Clone, Debug)]

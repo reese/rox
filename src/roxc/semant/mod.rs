@@ -93,8 +93,6 @@ fn analyse_statement(
                 match statement.as_ref() {
                     Return(maybe_expression) => {
                         if let Some(expression) = maybe_expression {
-                            let function_return_type =
-                                *env.get::<String>(&return_type.as_ref().expect("Type mismatch: expected to have no return value")).unwrap();
                             let expression_type =  analyse_expression(
                                 types,
                                 expression.clone(),
@@ -104,7 +102,7 @@ fn analyse_statement(
                             unify(
                                 types,
                                 expression_type,
-                                function_return_type,
+                                result_type,
                             );
                         } else if return_type.is_some() {
                             panic!("Type mismatch: expected a value to be returned");
@@ -137,12 +135,8 @@ fn analyse_expression(
         Expression::Assignment(name, expression) => {
             let expr_type =
                 analyse_expression(types, expression, env, non_generic);
-            let variable = new_variable(types);
-            types.push(Type::Variable {
-                id: variable,
-                instance: Some(expr_type),
-            });
-            env.insert(name, variable);
+            let variable_type = env.get(&name).unwrap();
+            unify(types, expr_type, *variable_type);
             expr_type
         }
         Expression::Identifier(ref name) => {
@@ -151,6 +145,17 @@ fn analyse_expression(
         Expression::String(_) => STRING_TYPE_VAL,
         Expression::Number(_) => NUMBER_TYPE_VAL,
         Expression::Boolean(_) => BOOL_TYPE_VAL,
+        Expression::Variable(name, expression) => {
+            let expr_type =
+                analyse_expression(types, expression, env, non_generic);
+            let variable = new_variable(types);
+            types.push(Type::Variable {
+                id: variable,
+                instance: Some(expr_type),
+            });
+            env.insert(name, variable);
+            expr_type
+        }
         Expression::Or(left, right) | Expression::And(left, right) => {
             let left_type = analyse_expression(types, left, env, non_generic);
             let right_type = analyse_expression(types, right, env, non_generic);
@@ -201,7 +206,10 @@ fn analyse_expression(
                 panic!("Type mismatch: tried to call an object that is not a function")
             }
         }
-        _ => panic!("How did you get here?"),
+        x => {
+            println!("Got type: {:?}", x);
+            panic!("This shouldn't have happened?");
+        }
     }
 }
 

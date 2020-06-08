@@ -1,8 +1,8 @@
 use std::{io, str};
 
 use crate::roxc::{
-    analyse_program, get_type_from_name, Declaration, FunctionTranslator,
-    RoxError, RoxResult, Stack, Statement,
+    analyse_program, get_type_from_name, Declaration, FunctionDeclaration,
+    FunctionTranslator, RoxError, RoxResult, Stack, Statement,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
@@ -28,6 +28,7 @@ pub struct Compiler {
     data_context: DataContext,
     module: Module<ObjectBackend>,
     environment_stack: Stack<HashMap<String, Variable>>,
+    function_stack: Stack<HashMap<String, FunctionDeclaration>>,
 }
 
 impl Compiler {
@@ -42,12 +43,15 @@ impl Compiler {
         let module = cranelift_module::Module::new(builder);
         let mut environment_stack = Stack::new();
         environment_stack.push(HashMap::new());
+        let mut function_stack = Stack::new();
+        function_stack.push(HashMap::new());
 
         Compiler {
             function_builder_context: FunctionBuilderContext::new(),
             data_context: DataContext::new(),
             module,
             environment_stack,
+            function_stack,
         }
     }
 
@@ -114,6 +118,12 @@ impl Compiler {
                             signature.params.push(AbiParam::new(codegen_type));
                         });
 
+                        if let Some(return_) = return_type {
+                            signature.returns.push(AbiParam::new(
+                                get_type_from_name(return_),
+                            ));
+                        }
+
                         codegen_context.func.name = func_name.parse().unwrap();
                         codegen_context.func.signature = signature;
 
@@ -121,9 +131,20 @@ impl Compiler {
                             &mut codegen_context.func,
                             &mut self.function_builder_context,
                         );
+
+                        let function_declaration = FunctionDeclaration {
+                            name: func_name.clone(),
+                            params: params.clone(),
+                            return_type: return_type.clone(),
+                        };
+                        self.function_stack
+                            .top_mut()
+                            .insert(func_name.clone(), function_declaration);
+
                         let mut function_translator = FunctionTranslator::new(
                             &mut builder,
                             &mut self.environment_stack,
+                            &mut self.function_stack,
                             &mut self.module,
                         );
 

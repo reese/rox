@@ -1,4 +1,6 @@
-use crate::roxc::{syntax, Expression, Param, RoxType, Stack, Statement};
+use crate::roxc::{
+    syntax, Expression, FunctionDeclaration, Param, RoxType, Stack, Statement,
+};
 use cranelift::prelude::*;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectBackend;
@@ -8,6 +10,7 @@ use std::borrow::Borrow;
 pub struct FunctionTranslator<'func> {
     builder: &'func mut FunctionBuilder<'func>,
     pub variables: &'func mut Stack<HashMap<String, Variable>>,
+    pub functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
     pub module: &'func mut Module<ObjectBackend>,
 }
 
@@ -15,11 +18,13 @@ impl<'func> FunctionTranslator<'func> {
     pub fn new(
         builder: &'func mut FunctionBuilder<'func>,
         variables: &'func mut Stack<HashMap<String, Variable>>,
+        functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
         module: &'func mut Module<ObjectBackend>,
     ) -> Self {
         FunctionTranslator {
             builder,
             variables,
+            functions,
             module,
         }
     }
@@ -27,15 +32,16 @@ impl<'func> FunctionTranslator<'func> {
     pub fn translate_function(
         &mut self,
         params: &[Param],
-        _return_type: &Option<String>,
+        return_type: &Option<String>,
         block: &Vec<Box<Statement>>,
     ) {
         self.initialize_block(params);
         self.translate_block(block);
 
-        // TODO: Figure out return values from semantic analysis pass?
-        // TODO: Or can I do this when evaluating return values?
-        self.builder.ins().return_(&[]);
+        if return_type.is_none() {
+            dbg!(return_type.clone());
+            self.builder.ins().return_(&[]);
+        }
         self.builder.finalize();
     }
 
@@ -53,6 +59,14 @@ impl<'func> FunctionTranslator<'func> {
             Statement::FunctionDeclaration(..) => {
                 panic!("For right now, functions can only be declared at the top level.")
             }
+            Statement::Return(maybe_expression) => {
+                if let Some(expression) = maybe_expression {
+                    let returns = self.translate_expression(expression);
+                    self.builder.ins().return_(&returns);
+                } else {
+                    self.builder.ins().return_(&[]);
+                }
+            }
             _ => {}
         }
     }
@@ -62,17 +76,27 @@ impl<'func> FunctionTranslator<'func> {
         expression: &Expression,
     ) -> Vec<Value> {
         use Expression::*;
+
         match expression {
             Boolean(bool) => vec![self.builder.ins().bconst(types::B1, *bool)],
             FunctionCall(function_name, args) => {
-                // TODO: Determine function types in semantics pass
-                // Functions need to know (1) name, (2) arg types, and (3) return type(s)
+                let FunctionDeclaration {
+                    return_type,
+                    params,
+                    ..
+                } = self.functions.top().get(function_name).unwrap();
+
                 let mut signature = self.module.make_signature();
-                args.iter().for_each(|_| {
-                    signature.params.push(AbiParam::new(types::F64));
+                params.iter().for_each(|(_, type_name)| {
+                    signature
+                        .params
+                        .push(AbiParam::new(get_type_from_name(type_name)));
                 });
-                // TODO: Support return types
-                // signature.returns.push(AbiParam::new(types::F64));
+                if let Some(return_) = return_type {
+                    signature
+                        .returns
+                        .push(AbiParam::new(get_type_from_name(return_)));
+                }
 
                 let callee = self
                     .module
@@ -90,11 +114,26 @@ impl<'func> FunctionTranslator<'func> {
                     .iter()
                     .map(|arg| *self.translate_expression(arg).get(0).unwrap())
                     .collect();
-                self.builder.ins().call(local_callee, &argument_values);
-                Vec::new()
-                // builder.inst_results(call)[0] // TODO: Support multiple returns
+                let call =
+                    self.builder.ins().call(local_callee, &argument_values);
+                let returns = self.builder.inst_results(call); // TODO: Support multiple returns
+                if !returns.is_empty() {
+                    vec![returns[0]]
+                } else {
+                    returns.to_vec()
+                }
             }
             Number(num) => vec![self.builder.ins().f64const(*num)],
+            Variable(name, expression) => {
+                let expression = self.translate_expression(expression)[0];
+                let variable_env = self.variables.top_mut();
+                let variable =
+                    cranelift::prelude::Variable::new(variable_env.len());
+                variable_env.insert(name.clone(), variable);
+                self.builder.declare_var(variable, types::F64); // TODO: Map ArenaTypes to concrete types
+                self.builder.def_var(variable, expression);
+                vec![expression]
+            }
             Identifier(name) => {
                 let variables = self.variables.top();
                 let variable =
@@ -169,18 +208,21 @@ impl<'func> FunctionTranslator<'func> {
 
 pub(crate) fn get_type_from_name(type_str: &str) -> Type {
     let rox_type = match type_str {
-        "int" => RoxType::Int,
-        "float" => RoxType::Float,
+        "bool" => RoxType::Bool,
+        "number" => RoxType::Number,
         "str" => RoxType::String,
-        _ => unimplemented!(),
+        x => {
+            dbg!(x);
+            unimplemented!()
+        }
     };
     get_codegen_type(&rox_type)
 }
 
 fn get_codegen_type(rox_type: &RoxType) -> types::Type {
     match rox_type {
-        RoxType::Int => types::I64,
-        RoxType::Float => types::F64,
+        RoxType::Bool => types::B1,
+        RoxType::Number => types::F64,
         _ => unimplemented!(),
     }
 }
