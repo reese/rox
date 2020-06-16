@@ -1,6 +1,6 @@
 pub type ArenaType = usize;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
     Variable {
         id: ArenaType,
@@ -15,11 +15,11 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn new_variable(id: ArenaType) -> Type {
+    pub(crate) fn new_variable(id: ArenaType) -> Type {
         Type::Variable { id, instance: None }
     }
 
-    pub fn new_function(
+    pub(crate) fn new_function(
         id: ArenaType,
         name: &str,
         arg_types: &[ArenaType],

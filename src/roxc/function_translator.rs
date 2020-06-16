@@ -39,7 +39,6 @@ impl<'func> FunctionTranslator<'func> {
         self.translate_block(block);
 
         if return_type.is_none() {
-            dbg!(return_type.clone());
             self.builder.ins().return_(&[]);
         }
         self.builder.finalize();

@@ -1,8 +1,11 @@
+use crate::roxc::{semant, ArenaType};
+
 #[derive(Clone, Debug)]
 pub enum Expression {
     And(Box<Expression>, Box<Expression>),
     Assignment(String, Box<Expression>),
     Boolean(bool),
+    #[allow(clippy::vec_box)]
     FunctionCall(String, Vec<Box<Expression>>),
     Identifier(String),
     Number(f64),
@@ -37,13 +40,34 @@ pub enum Unary {
     Negate,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RoxType {
     Bool,
     Number,
     String,
     // TODO: Support user-defined types
     // UserType(String),
+}
+
+impl From<ArenaType> for RoxType {
+    fn from(arena_type: ArenaType) -> Self {
+        match arena_type {
+            semant::NUMBER_TYPE_VAL => RoxType::Number,
+            semant::BOOL_TYPE_VAL => RoxType::Bool,
+            semant::STRING_TYPE_VAL => RoxType::String,
+            _ => panic!("Rox does not yet support user-defined types"),
+        }
+    }
+}
+
+impl Into<ArenaType> for RoxType {
+    fn into(self) -> usize {
+        match self {
+            RoxType::Number => semant::NUMBER_TYPE_VAL,
+            RoxType::Bool => semant::BOOL_TYPE_VAL,
+            RoxType::String => semant::STRING_TYPE_VAL,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
