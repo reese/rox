@@ -1,9 +1,9 @@
 #![deny(missing_docs)]
 #![doc(
-    html_logo_url = "https://github.com/reese/rox/raw/master/assets/rox-logo-transparent-bg.png"
+    html_logo_url = "https://raw.githubusercontent.com/reese/rox/master/assets/rox-logo-transparent-bg.png"
 )]
 #![doc(
-    html_favicon_url = "https://github.com/reese/rox/raw/master/assets/favicon.png"
+    html_favicon_url = "https://raw.githubusercontent.com/reese/rox/master/assets/favicon.ico"
 )]
 //! # Rox
 //! `Rox` is high-level, statically-typed, compiled language that mixes
