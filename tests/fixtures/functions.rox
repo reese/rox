@@ -2,9 +2,10 @@ fn test () -> number {
     return 4 + 5;
 }
 
-fn main () -> number {
+fn main () {
     test();
     let three = 1 + 2;
     let nine = three + 6;
-    return 1.1 + 2.4;
+    1.1 + 2.4;
+    return;
 }

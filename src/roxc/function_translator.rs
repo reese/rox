@@ -38,9 +38,6 @@ impl<'func> FunctionTranslator<'func> {
         self.initialize_block(params);
         self.translate_block(block);
 
-        if return_type.is_none() {
-            self.builder.ins().return_(&[]);
-        }
         self.builder.finalize();
     }
 

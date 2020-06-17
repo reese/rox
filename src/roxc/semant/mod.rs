@@ -86,7 +86,6 @@ fn analyse_statement(
             // :more-thonk:
             let param_types: Vec<(String, usize)> =
                 get_param_types(types, env, &params);
-            // TODO: What do we do with the return type of `return;`? Do we support a `()` type? `void`?
             let result_type =
                 return_type.clone().map(|t| *env.get(&t).unwrap());
             let new_env = env.clone();
@@ -110,12 +109,14 @@ fn analyse_statement(
                                     env,
                                     non_generic,
                                 );
-                                unify(types, expression_type.clone().into(), result_type.unwrap());
+                                unify(
+                                    types,
+                                    expression_type.clone().into(),
+                                    result_type.unwrap(),
+                                );
                                 TaggedStatement::Return(Some(expression_type))
                             } else {
-                                panic!(
-                                    "Type mismatch: expected a value to be returned"
-                                );
+                                TaggedStatement::Return(None)
                             }
                         }
                         _ => analyse_statement(
@@ -129,10 +130,13 @@ fn analyse_statement(
                 })
                 .collect::<Vec<_>>();
 
+            let return_type_vec =
+                result_type.map_or_else(Vec::new, |t| vec![t]);
+
             let new_arena_type = new_function(
                 types,
                 arg_types.as_ref(),
-                &[result_type.unwrap()],
+                return_type_vec.as_slice(),
             );
             env.insert(name.clone(), new_arena_type);
             let declaration = syntax::FunctionDeclaration {
@@ -186,7 +190,6 @@ fn analyse_expression(
     env: &mut Env,
     non_generic: &HashSet<ArenaType>,
 ) -> TaggedExpression {
-    dbg!(node.clone());
     let expression_type: RoxType = match *node.clone() {
         Expression::Assignment(name, expression) => {
             let TaggedExpression { rox_type, .. } =
