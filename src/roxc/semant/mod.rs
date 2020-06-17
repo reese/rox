@@ -78,7 +78,7 @@ fn analyse_statement(
     match node {
         Expression(expression) => {
             let tagged_expression =
-                analyse_expression(types, expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic);
             TaggedStatement::Expression(tagged_expression)
         }
         FunctionDeclaration(name, params, return_type, statements) => {
@@ -103,7 +103,7 @@ fn analyse_statement(
                             if let Some(expression) = maybe_expression {
                                 let expression_type = analyse_expression(
                                     types,
-                                    expression.clone(),
+                                    *expression.clone(),
                                     env,
                                     non_generic,
                                 );
@@ -184,14 +184,14 @@ fn get_param_types(
 
 fn analyse_expression(
     types: &mut Vec<Type>,
-    node: Box<Expression>,
+    node: Expression,
     env: &mut Env,
     non_generic: &HashSet<ArenaType>,
 ) -> TaggedExpression {
-    match *node.clone() {
+    match node {
         Expression::Assignment(name, expression) => {
             let tagged_expression =
-                analyse_expression(types, expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic);
             let variable_type = env.get(&name).unwrap();
             unify(types, tagged_expression.clone().into(), *variable_type);
             TaggedExpression::Assignment(name, Box::new(tagged_expression))
@@ -208,7 +208,7 @@ fn analyse_expression(
         Expression::Boolean(bool) => TaggedExpression::Boolean(bool),
         Expression::Variable(name, expression) => {
             let tagged_expression =
-                analyse_expression(types, expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic);
             let variable = tagged_expression.clone().into();
             types.push(Type::Variable {
                 id: variable,
@@ -219,9 +219,9 @@ fn analyse_expression(
         }
         Expression::Or(left, right) => {
             let left_expression =
-                analyse_expression(types, left, env, non_generic);
+                analyse_expression(types, *left, env, non_generic);
             let right_expression =
-                analyse_expression(types, right, env, non_generic);
+                analyse_expression(types, *right, env, non_generic);
             unify(types, left_expression.clone().into(), BOOL_TYPE_VAL);
             unify(types, right_expression.clone().into(), BOOL_TYPE_VAL);
             TaggedExpression::Or(
@@ -231,9 +231,9 @@ fn analyse_expression(
         }
         Expression::And(left, right) => {
             let left_expression =
-                analyse_expression(types, left, env, non_generic);
+                analyse_expression(types, *left, env, non_generic);
             let right_expression =
-                analyse_expression(types, right, env, non_generic);
+                analyse_expression(types, *right, env, non_generic);
             unify(types, left_expression.clone().into(), BOOL_TYPE_VAL);
             unify(types, right_expression.clone().into(), BOOL_TYPE_VAL);
             TaggedExpression::And(
@@ -243,9 +243,9 @@ fn analyse_expression(
         }
         Expression::Operation(left, operation, right) => {
             let left_expression =
-                analyse_expression(types, left, env, non_generic);
+                analyse_expression(types, *left, env, non_generic);
             let right_expression =
-                analyse_expression(types, right, env, non_generic);
+                analyse_expression(types, *right, env, non_generic);
             unify(types, left_expression.clone().into(), NUMBER_TYPE_VAL);
             unify(types, right_expression.clone().into(), NUMBER_TYPE_VAL);
             TaggedExpression::Operation(
@@ -256,7 +256,7 @@ fn analyse_expression(
         }
         Expression::Unary(operator, expression) => {
             let tagged_expression =
-                analyse_expression(types, expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic);
             unify(types, tagged_expression.clone().into(), NUMBER_TYPE_VAL);
             TaggedExpression::Unary(operator, tagged_expression.into())
         }
@@ -272,7 +272,7 @@ fn analyse_expression(
                         .map(|arg| {
                             analyse_expression(
                                 types,
-                                arg.clone(),
+                                *arg.clone(),
                                 env,
                                 non_generic,
                             )
@@ -307,55 +307,6 @@ fn analyse_expression(
             panic!("This shouldn't have happened?");
         }
     }
-}
-
-fn fresh(
-    types: &mut Vec<Type>,
-    arena_type: ArenaType,
-    non_generics: &[ArenaType],
-) -> ArenaType {
-    let mut mappings = HashMap::new();
-
-    fn recursive_fresh(
-        types: &mut Vec<Type>,
-        arena_type: ArenaType,
-        aliases: &mut HashMap<ArenaType, ArenaType>,
-        non_generics: &[ArenaType],
-    ) -> ArenaType {
-        let pruned_type = prune(types, arena_type);
-        match types.get(pruned_type).unwrap().clone() {
-            Type::Variable { .. } => {
-                if is_generic(types, pruned_type, non_generics) {
-                    *aliases
-                        .entry(pruned_type)
-                        .or_insert_with(|| new_variable(types))
-                } else {
-                    pruned_type
-                }
-            }
-            Type::Function {
-                arg_types,
-                return_types,
-                ..
-            } => {
-                let fresh_args = arg_types
-                    .iter()
-                    .map(|type_| {
-                        recursive_fresh(types, *type_, aliases, non_generics)
-                    })
-                    .collect::<Vec<_>>();
-                let fresh_returns = return_types
-                    .iter()
-                    .map(|type_| {
-                        recursive_fresh(types, *type_, aliases, non_generics)
-                    })
-                    .collect::<Vec<_>>();
-                new_function(types, fresh_args.as_ref(), fresh_returns.as_ref())
-            }
-        }
-    }
-
-    recursive_fresh(types, arena_type, &mut mappings, non_generics)
 }
 
 /// Returns the currently defining instance of `type_`.
@@ -432,6 +383,9 @@ fn unify(types: &mut Vec<Type>, first_type: ArenaType, second_type: ArenaType) {
     }
 }
 
+// This could potentially be useful when we have generic types,
+// so leaving it for now.
+#[allow(dead_code)]
 fn is_generic(
     types: &mut Vec<Type>,
     arena_type: ArenaType,

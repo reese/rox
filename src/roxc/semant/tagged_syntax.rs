@@ -30,15 +30,13 @@ impl Into<ArenaType> for TaggedExpression {
     fn into(self) -> ArenaType {
         use TaggedExpression::*;
         match self {
-            And(_, _) | Boolean(_) | Or(_, _) => BOOL_TYPE_VAL.clone(),
+            And(_, _) | Boolean(_) | Or(_, _) => BOOL_TYPE_VAL,
             Assignment(_, expression) => (*expression).into(),
             FunctionCall(_, _, rox_type) | Identifier(_, rox_type) => {
                 rox_type.into()
             }
-            Number(_) | Operation(_, _, _) | Unary(_, _) => {
-                NUMBER_TYPE_VAL.clone()
-            }
-            String(_) => STRING_TYPE_VAL.clone(),
+            Number(_) | Operation(_, _, _) | Unary(_, _) => NUMBER_TYPE_VAL,
+            String(_) => STRING_TYPE_VAL,
             Variable(_, expression) => (*expression).into(),
         }
     }
@@ -50,6 +48,7 @@ type TaggedBlock = Vec<Box<TaggedStatement>>;
 pub(crate) enum TaggedStatement {
     Expression(TaggedExpression),
     Return(Option<TaggedExpression>),
+    #[allow(dead_code)]
     IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
     FunctionDeclaration(FunctionDeclaration, TaggedBlock),
 }

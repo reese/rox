@@ -9,7 +9,6 @@ use std::env::args;
 use std::path::Path;
 use std::process::exit;
 
-// TODO: Make a more robust CLI with `StructOpt`
 /// # Rox
 /// This is the executable for running the Rox roxc.
 fn main() {

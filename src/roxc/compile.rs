@@ -3,7 +3,7 @@ use std::{io, str};
 use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
     analyse_program, get_type_from_name, Declaration, FunctionDeclaration,
-    FunctionTranslator, RoxError, RoxResult, Stack, Statement,
+    FunctionTranslator, RoxError, RoxResult, Stack,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
@@ -26,6 +26,8 @@ type LalrpopParseError<'input> =
 
 pub struct Compiler {
     function_builder_context: FunctionBuilderContext,
+    #[allow(dead_code)]
+    // This will be used when we handle strings and other data types
     data_context: DataContext,
     module: Module<ObjectBackend>,
     environment_stack: Stack<HashMap<String, Variable>>,

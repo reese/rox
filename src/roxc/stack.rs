@@ -8,6 +8,7 @@ impl<T> Stack<T> {
         Stack { stack: Vec::new() }
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.stack.is_empty()
     }
@@ -16,6 +17,7 @@ impl<T> Stack<T> {
         self.stack.push(item);
     }
 
+    #[allow(dead_code)]
     pub fn pop(&mut self) -> Option<T> {
         self.stack.pop()
     }
