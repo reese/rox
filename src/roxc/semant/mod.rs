@@ -17,7 +17,7 @@
 //! implementation. It has been ported here in Rust and modified to match
 //! the implementation of Rox's lexer.
 
-mod tagged_syntax;
+pub(crate) mod tagged_syntax;
 mod types;
 use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
@@ -82,8 +82,6 @@ fn analyse_statement(
             TaggedStatement::Expression(tagged_expression)
         }
         FunctionDeclaration(name, params, return_type, statements) => {
-            // TODO: The return type in here is return as 3 when it should be 0 (for number)
-            // :more-thonk:
             let param_types: Vec<(String, usize)> =
                 get_param_types(types, env, &params);
             let result_type =
@@ -190,51 +188,77 @@ fn analyse_expression(
     env: &mut Env,
     non_generic: &HashSet<ArenaType>,
 ) -> TaggedExpression {
-    let expression_type: RoxType = match *node.clone() {
+    match *node.clone() {
         Expression::Assignment(name, expression) => {
-            let TaggedExpression { rox_type, .. } =
+            let tagged_expression =
                 analyse_expression(types, expression, env, non_generic);
             let variable_type = env.get(&name).unwrap();
-            unify(types, rox_type.clone().into(), *variable_type);
-            rox_type
+            unify(types, tagged_expression.clone().into(), *variable_type);
+            TaggedExpression::Assignment(name, Box::new(tagged_expression))
         }
         Expression::Identifier(ref name) => {
             let arena_type = env.get(name).unwrap();
-            RoxType::from(*arena_type)
+            TaggedExpression::Identifier(
+                name.clone(),
+                RoxType::from(*arena_type),
+            )
         }
-        Expression::String(_) => STRING_TYPE_VAL.into(),
-        Expression::Number(_) => NUMBER_TYPE_VAL.into(),
-        Expression::Boolean(_) => BOOL_TYPE_VAL.into(),
+        Expression::String(string) => TaggedExpression::String(string),
+        Expression::Number(num) => TaggedExpression::Number(num),
+        Expression::Boolean(bool) => TaggedExpression::Boolean(bool),
         Expression::Variable(name, expression) => {
-            let TaggedExpression { rox_type, .. } =
+            let tagged_expression =
                 analyse_expression(types, expression, env, non_generic);
-            let variable = rox_type.clone().into();
+            let variable = tagged_expression.clone().into();
             types.push(Type::Variable {
                 id: variable,
                 instance: Some(variable),
             });
-            env.insert(name, variable);
-            rox_type
+            env.insert(name.clone(), variable);
+            TaggedExpression::Variable(name, Box::new(tagged_expression))
         }
-        Expression::Or(left, right) | Expression::And(left, right) => {
-            let left_type = analyse_expression(types, left, env, non_generic);
-            let right_type = analyse_expression(types, right, env, non_generic);
-            unify(types, left_type.into(), BOOL_TYPE_VAL);
-            unify(types, right_type.into(), BOOL_TYPE_VAL);
-            BOOL_TYPE_VAL.into()
+        Expression::Or(left, right) => {
+            let left_expression =
+                analyse_expression(types, left, env, non_generic);
+            let right_expression =
+                analyse_expression(types, right, env, non_generic);
+            unify(types, left_expression.clone().into(), BOOL_TYPE_VAL);
+            unify(types, right_expression.clone().into(), BOOL_TYPE_VAL);
+            TaggedExpression::Or(
+                left_expression.into(),
+                right_expression.into(),
+            )
         }
-        Expression::Operation(left, _, right) => {
-            let left_type = analyse_expression(types, left, env, non_generic);
-            let right_type = analyse_expression(types, right, env, non_generic);
-            unify(types, left_type.into(), NUMBER_TYPE_VAL);
-            unify(types, right_type.into(), NUMBER_TYPE_VAL);
-            NUMBER_TYPE_VAL.into()
+        Expression::And(left, right) => {
+            let left_expression =
+                analyse_expression(types, left, env, non_generic);
+            let right_expression =
+                analyse_expression(types, right, env, non_generic);
+            unify(types, left_expression.clone().into(), BOOL_TYPE_VAL);
+            unify(types, right_expression.clone().into(), BOOL_TYPE_VAL);
+            TaggedExpression::And(
+                left_expression.into(),
+                right_expression.into(),
+            )
         }
-        Expression::Unary(_, expression) => {
-            let expr_type =
+        Expression::Operation(left, operation, right) => {
+            let left_expression =
+                analyse_expression(types, left, env, non_generic);
+            let right_expression =
+                analyse_expression(types, right, env, non_generic);
+            unify(types, left_expression.clone().into(), NUMBER_TYPE_VAL);
+            unify(types, right_expression.clone().into(), NUMBER_TYPE_VAL);
+            TaggedExpression::Operation(
+                left_expression.into(),
+                operation,
+                right_expression.into(),
+            )
+        }
+        Expression::Unary(operator, expression) => {
+            let tagged_expression =
                 analyse_expression(types, expression, env, non_generic);
-            unify(types, expr_type.into(), NUMBER_TYPE_VAL);
-            NUMBER_TYPE_VAL.into()
+            unify(types, tagged_expression.clone().into(), NUMBER_TYPE_VAL);
+            TaggedExpression::Unary(operator, tagged_expression.into())
         }
         Expression::FunctionCall(name, arg_expressions) => {
             let function_arena_type = *env.get(&name).unwrap();
@@ -242,21 +266,36 @@ fn analyse_expression(
                 types.get(function_arena_type).unwrap().clone();
             if let Type::Function { return_types, .. } = function_type_signature
             {
-                let new_arg_types = arg_expressions
-                    .iter()
-                    .map(|arg| {
-                        analyse_expression(types, arg.clone(), env, non_generic)
+                let tagged_arg_expressions: Vec<Box<TaggedExpression>> =
+                    arg_expressions
+                        .iter()
+                        .map(|arg| {
+                            analyse_expression(
+                                types,
+                                arg.clone(),
+                                env,
+                                non_generic,
+                            )
                             .into()
-                    })
+                        })
+                        .collect::<Vec<_>>();
+
+                let arg_arena_types = tagged_arg_expressions
+                    .iter()
+                    .map(|t| (*t.clone()).into())
                     .collect::<Vec<_>>();
 
                 let func = new_function(
                     types,
-                    new_arg_types.as_ref(),
+                    arg_arena_types.as_ref(),
                     return_types.as_ref(),
                 );
                 unify(types, func, function_arena_type);
-                RoxType::from(return_types[0])
+                TaggedExpression::FunctionCall(
+                    name,
+                    tagged_arg_expressions,
+                    RoxType::from(return_types[0]),
+                )
             // TODO: ^^ This will probably need to be refactored to support multiple returns
             // since functions no longer resolve to one value}
             } else {
@@ -267,25 +306,6 @@ fn analyse_expression(
             println!("Got type: {:?}", x);
             panic!("This shouldn't have happened?");
         }
-    };
-    TaggedExpression::new(node, expression_type)
-}
-
-fn get_type(
-    types: &mut Vec<Type>,
-    name: &str,
-    expression: Expression,
-    env: &Env,
-    non_generic: &HashSet<ArenaType>,
-) -> ArenaType {
-    if let Some(value) = env.get(name) {
-        let cloned_non_generics =
-            &non_generic.iter().cloned().collect::<Vec<_>>();
-        fresh(types, *value, cloned_non_generics)
-    } else if let Some(literal_val) = maybe_get_literal(expression) {
-        literal_val
-    } else {
-        panic!("Undefined symbol {:?}", name);
     }
 }
 
@@ -446,15 +466,4 @@ fn occurs_in(
     non_generics
         .iter()
         .any(|t| occurs_in_type(types, arena_type, *t))
-}
-
-fn maybe_get_literal(expression: Expression) -> Option<ArenaType> {
-    use Expression::*;
-    // TODO: Fix all of this
-    match expression {
-        Number(_) => Some(NUMBER_TYPE_VAL),
-        String(_) => Some(STRING_TYPE_VAL),
-        Boolean(_) => Some(BOOL_TYPE_VAL),
-        _ => None,
-    }
 }

@@ -1,5 +1,6 @@
 use std::{io, str};
 
+use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
     analyse_program, get_type_from_name, Declaration, FunctionDeclaration,
     FunctionTranslator, RoxError, RoxResult, Stack, Statement,
@@ -91,27 +92,30 @@ impl Compiler {
         &mut self,
         declarations: &[Declaration],
     ) -> RoxResult<()> {
-        analyse_program(declarations);
-        declarations.iter().for_each(|declaration| {
+        let tagged_declarations = analyse_program(declarations);
+        tagged_declarations.iter().for_each(|declaration| {
             self.translate_declaration(declaration).unwrap();
         });
         Ok(())
     }
 
-    pub fn translate_declaration(
+    pub(crate) fn translate_declaration(
         &mut self,
-        declaration: &Declaration,
+        declaration: &TaggedDeclaration,
     ) -> RoxResult<()> {
         match declaration {
-            Declaration::Function(func_declaration) => {
+            TaggedDeclaration::Function(func_declaration) => {
                 let mut codegen_context = self.module.make_context();
                 match func_declaration.borrow() {
-                    Statement::FunctionDeclaration(
-                        func_name,
-                        params,
-                        return_type,
+                    TaggedStatement::FunctionDeclaration(
+                        func_declaration,
                         block,
                     ) => {
+                        let FunctionDeclaration {
+                            name: func_name,
+                            params,
+                            return_type,
+                        } = func_declaration;
                         let mut signature = Signature::new(CallConv::SystemV);
                         params.iter().for_each(|(_, type_str)| {
                             let codegen_type = get_type_from_name(type_str);
@@ -120,7 +124,7 @@ impl Compiler {
 
                         if let Some(return_) = return_type {
                             signature.returns.push(AbiParam::new(
-                                get_type_from_name(return_),
+                                get_type_from_name(return_.as_ref()),
                             ));
                         }
 
@@ -148,16 +152,12 @@ impl Compiler {
                             &mut self.module,
                         );
 
-                        function_translator.translate_function(
-                            params,
-                            return_type,
-                            block,
-                        );
+                        function_translator.translate_function(&params, block);
 
                         let func = self
                             .module
                             .declare_function(
-                                func_name,
+                                &func_name,
                                 Linkage::Export,
                                 &codegen_context.func.signature,
                             )

@@ -1,6 +1,6 @@
-use crate::roxc::{
-    syntax, Expression, FunctionDeclaration, Param, RoxType, Stack, Statement,
-};
+use crate::roxc::semant::tagged_syntax::TaggedExpression;
+use crate::roxc::tagged_syntax::TaggedStatement;
+use crate::roxc::{syntax, FunctionDeclaration, Param, RoxType, Stack};
 use cranelift::prelude::*;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectBackend;
@@ -29,11 +29,10 @@ impl<'func> FunctionTranslator<'func> {
         }
     }
 
-    pub fn translate_function(
+    pub(crate) fn translate_function(
         &mut self,
         params: &[Param],
-        return_type: &Option<String>,
-        block: &Vec<Box<Statement>>,
+        block: &[Box<TaggedStatement>],
     ) {
         self.initialize_block(params);
         self.translate_block(block);
@@ -41,21 +40,21 @@ impl<'func> FunctionTranslator<'func> {
         self.builder.finalize();
     }
 
-    fn translate_block(&mut self, block: &[Box<Statement>]) {
+    fn translate_block(&mut self, block: &[Box<TaggedStatement>]) {
         block.iter().for_each(|statement| {
             self.translate_statement(statement);
         })
     }
 
-    fn translate_statement(&mut self, statement: &Box<Statement>) {
+    fn translate_statement(&mut self, statement: &TaggedStatement) {
         match statement.borrow() {
-            Statement::Expression(expression) => {
+            TaggedStatement::Expression(expression) => {
                 self.translate_expression(expression);
             }
-            Statement::FunctionDeclaration(..) => {
+            TaggedStatement::FunctionDeclaration(..) => {
                 panic!("For right now, functions can only be declared at the top level.")
             }
-            Statement::Return(maybe_expression) => {
+            TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
                     let returns = self.translate_expression(expression);
                     self.builder.ins().return_(&returns);
@@ -69,13 +68,13 @@ impl<'func> FunctionTranslator<'func> {
 
     pub fn translate_expression(
         &mut self,
-        expression: &Expression,
+        expression: &TaggedExpression,
     ) -> Vec<Value> {
-        use Expression::*;
+        use TaggedExpression::*;
 
         match expression {
             Boolean(bool) => vec![self.builder.ins().bconst(types::B1, *bool)],
-            FunctionCall(function_name, args) => {
+            FunctionCall(function_name, args, _rox_type) => {
                 let FunctionDeclaration {
                     return_type,
                     params,
@@ -121,16 +120,19 @@ impl<'func> FunctionTranslator<'func> {
             }
             Number(num) => vec![self.builder.ins().f64const(*num)],
             Variable(name, expression) => {
-                let expression = self.translate_expression(expression)[0];
+                let value = self.translate_expression(expression)[0];
                 let variable_env = self.variables.top_mut();
                 let variable =
                     cranelift::prelude::Variable::new(variable_env.len());
                 variable_env.insert(name.clone(), variable);
-                self.builder.declare_var(variable, types::F64); // TODO: Map ArenaTypes to concrete types
-                self.builder.def_var(variable, expression);
-                vec![expression]
+                self.builder.declare_var(
+                    variable,
+                    self.get_expression_type(expression),
+                );
+                self.builder.def_var(variable, value);
+                vec![value]
             }
-            Identifier(name) => {
+            Identifier(name, _rox_type) => {
                 let variables = self.variables.top();
                 let variable =
                     variables.get(name).expect("Variable not defined");
@@ -200,6 +202,34 @@ impl<'func> FunctionTranslator<'func> {
             self.builder.def_var(variable, *param);
         });
     }
+
+    fn get_expression_type(
+        &self,
+        tagged_expression: &TaggedExpression,
+    ) -> Type {
+        use TaggedExpression::*;
+        match tagged_expression {
+            String(_) => get_codegen_type(&RoxType::String),
+            Number(_) | Operation(_, _, _) | Unary(_, _) => {
+                get_codegen_type(&RoxType::Number)
+            }
+            Boolean(_) => get_codegen_type(&RoxType::Bool),
+            And(_, _) => get_codegen_type(&RoxType::Bool),
+            Assignment(_, expression) => self.get_expression_type(expression),
+            FunctionCall(name, _, _rox_type) => {
+                let declaration = self.functions.top().get(name).unwrap();
+                let FunctionDeclaration { return_type, .. } = declaration;
+                return_type
+                    .as_ref()
+                    // `INVALID` is just `VOID`
+                    .map_or(types::INVALID, |t| get_type_from_name(t.as_ref()))
+            }
+            x => {
+                dbg!(x);
+                todo!()
+            }
+        }
+    }
 }
 
 pub(crate) fn get_type_from_name(type_str: &str) -> Type {
@@ -219,6 +249,6 @@ fn get_codegen_type(rox_type: &RoxType) -> types::Type {
     match rox_type {
         RoxType::Bool => types::B1,
         RoxType::Number => types::F64,
-        _ => unimplemented!(),
+        _ => todo!(),
     }
 }
