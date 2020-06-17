@@ -35,14 +35,15 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(name: &str) -> Self {
+    pub fn new() -> Self {
         let mut flags_builder = cranelift::codegen::settings::builder();
         flags_builder.enable("is_pic").unwrap();
         flags_builder.enable("enable_verifier").unwrap();
         let flags = settings::Flags::new(flags_builder);
         let isa = codegen::isa::lookup(Triple::host()).unwrap().finish(flags);
 
-        let builder = ObjectBuilder::new(isa, name, default_libcall_names());
+        // I'm not _totally_ sure what this second option does
+        let builder = ObjectBuilder::new(isa, "roxc", default_libcall_names());
         let module = cranelift_module::Module::new(builder);
         let mut environment_stack = Stack::new();
         environment_stack.push(HashMap::new());
@@ -68,7 +69,7 @@ impl Compiler {
         }
     }
 
-    pub fn finish(self, output: &Path) -> io::Result<()> {
+    pub fn finish(self, output: impl AsRef<Path>) -> io::Result<()> {
         let product = self.module.finish();
         let bytes = product.emit().unwrap();
         File::create(output)?

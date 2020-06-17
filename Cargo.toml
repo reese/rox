@@ -37,6 +37,7 @@ cranelift-object = "0.63"
 im = "14.3.0"
 lalrpop-util = "0.18.1"
 regex = "1"
+structopt = "0.3.15"
 target-lexicon = "0.10.0"
 
 [dev-dependencies]
