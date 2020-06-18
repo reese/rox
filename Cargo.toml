@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/reese/rox"
 homepage = "https://github.com/reese/rox"
 categories = ["command-line-utilities"]
-keywords = ["compiler", "programming language", "rox"]
+keywords = ["compiler", "rox"]
 
 [package.metadata.docs.rs]
 document-private-items = true
