@@ -7,7 +7,6 @@ pub type RoxResult<T> = std::result::Result<T, RoxError>;
 #[derive(Clone, Debug, PartialEq)]
 pub enum RoxErrorType {
     CompileError,
-    TypeInferenceError,
 }
 
 #[derive(Clone, Debug, PartialEq)]

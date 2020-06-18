@@ -31,7 +31,7 @@ use std::process::{exit, Command};
 /// it would likely be a good idea to refactor these
 /// to have POSIX compliant error codes, or at least
 /// some consistent error code system.
-pub(crate) fn build_file(
+pub fn build_file(
     path: PathBuf,
     output: PathBuf,
     no_link: bool,
@@ -55,7 +55,7 @@ pub(crate) fn build_file(
 /// This function generates the native object file
 /// and optionally (see the `no_link` argument) links
 /// it using the machine's default C compiler.
-pub(crate) fn compile_and_maybe_link(
+fn compile_and_maybe_link(
     input: &str,
     output: PathBuf,
     no_link: bool,
