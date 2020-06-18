@@ -2,12 +2,13 @@ use crate::roxc::semant::tagged_syntax::TaggedExpression;
 use crate::roxc::tagged_syntax::TaggedStatement;
 use crate::roxc::{syntax, FunctionDeclaration, Param, RoxType, Stack};
 use cranelift::prelude::*;
-use cranelift_module::{Backend, Linkage, Module};
+use cranelift_module::{Backend, DataContext, Linkage, Module};
 use im::HashMap;
 use std::borrow::Borrow;
 
 pub struct FunctionTranslator<'func, T: Backend> {
     builder: &'func mut FunctionBuilder<'func>,
+    data_context: &'func mut DataContext,
     pub variables: &'func mut Stack<HashMap<String, Variable>>,
     pub functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
     pub module: &'func mut Module<T>,
@@ -16,12 +17,14 @@ pub struct FunctionTranslator<'func, T: Backend> {
 impl<'func, T: Backend> FunctionTranslator<'func, T> {
     pub fn new(
         builder: &'func mut FunctionBuilder<'func>,
+        data_context: &'func mut DataContext,
         variables: &'func mut Stack<HashMap<String, Variable>>,
         functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
         module: &'func mut Module<T>,
     ) -> Self {
         FunctionTranslator {
             builder,
+            data_context,
             variables,
             functions,
             module,
@@ -82,14 +85,16 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
                 let mut signature = self.module.make_signature();
                 params.iter().for_each(|(_, type_name)| {
-                    signature
-                        .params
-                        .push(AbiParam::new(get_type_from_name(type_name)));
+                    signature.params.push(AbiParam::new(get_type_from_name(
+                        type_name,
+                        self.module,
+                    )));
                 });
                 if let Some(return_) = return_type {
-                    signature
-                        .returns
-                        .push(AbiParam::new(get_type_from_name(return_)));
+                    signature.returns.push(AbiParam::new(get_type_from_name(
+                        return_,
+                        self.module,
+                    )));
                 }
 
                 let callee = self
@@ -118,6 +123,24 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 }
             }
             Number(num) => vec![self.builder.ins().f64const(*num)],
+            String(string) => {
+                self.data_context
+                    .define(string.clone().into_bytes().into_boxed_slice());
+                let id = self
+                    .module
+                    .declare_data(string, Linkage::Export, false, false, None)
+                    .unwrap();
+                self.module.define_data(id, &self.data_context).unwrap();
+                let value =
+                    self.module.declare_data_in_func(id, self.builder.func);
+                self.data_context.clear();
+                self.module.finalize_definitions();
+
+                vec![self.builder.ins().global_value(
+                    self.module.target_config().pointer_type(),
+                    value,
+                )]
+            }
             Variable(name, expression) => {
                 let value = self.translate_expression(expression)[0];
                 let variable_env = self.variables.top_mut();
@@ -197,7 +220,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             let variable = Variable::new(index);
             self.variables.top_mut().insert(name, variable);
             self.builder
-                .declare_var(variable, get_type_from_name(&type_));
+                .declare_var(variable, get_type_from_name(&type_, self.module));
             self.builder.def_var(variable, *param);
         });
     }
@@ -208,12 +231,12 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     ) -> Type {
         use TaggedExpression::*;
         match tagged_expression {
-            String(_) => get_codegen_type(&RoxType::String),
+            String(_) => get_codegen_type(&RoxType::String, self.module),
             Number(_) | Operation(_, _, _) | Unary(_, _) => {
-                get_codegen_type(&RoxType::Number)
+                get_codegen_type(&RoxType::Number, self.module)
             }
-            Boolean(_) => get_codegen_type(&RoxType::Bool),
-            And(_, _) => get_codegen_type(&RoxType::Bool),
+            Boolean(_) => get_codegen_type(&RoxType::Bool, &self.module),
+            And(_, _) => get_codegen_type(&RoxType::Bool, self.module),
             Assignment(_, expression) => self.get_expression_type(expression),
             FunctionCall(name, _, _rox_type) => {
                 let declaration = self.functions.top().get(name).unwrap();
@@ -221,7 +244,9 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 return_type
                     .as_ref()
                     // `INVALID` is just `VOID`
-                    .map_or(types::INVALID, |t| get_type_from_name(t.as_ref()))
+                    .map_or(types::INVALID, |t| {
+                        get_type_from_name(t.as_ref(), self.module)
+                    })
             }
             x => {
                 dbg!(x);
@@ -231,7 +256,10 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     }
 }
 
-pub(crate) fn get_type_from_name(type_str: &str) -> Type {
+pub(crate) fn get_type_from_name<T: Backend>(
+    type_str: &str,
+    module: &Module<T>,
+) -> Type {
     let rox_type = match type_str {
         "bool" => RoxType::Bool,
         "number" => RoxType::Number,
@@ -241,13 +269,16 @@ pub(crate) fn get_type_from_name(type_str: &str) -> Type {
             unimplemented!()
         }
     };
-    get_codegen_type(&rox_type)
+    get_codegen_type(&rox_type, module)
 }
 
-fn get_codegen_type(rox_type: &RoxType) -> types::Type {
+fn get_codegen_type<T: Backend>(
+    rox_type: &RoxType,
+    module: &Module<T>,
+) -> types::Type {
     match rox_type {
         RoxType::Bool => types::B1,
         RoxType::Number => types::F64,
-        _ => todo!(),
+        RoxType::String => module.target_config().pointer_type(),
     }
 }

@@ -7,5 +7,6 @@ fn main () {
     let three = 1 + 2;
     let nine = three + 6;
     1.1 + 2.4;
+    let x = "test";
     return;
 }

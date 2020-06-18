@@ -103,13 +103,17 @@ impl<T: Backend> Compiler<T> {
                         } = func_declaration;
                         let mut signature = Signature::new(CallConv::SystemV);
                         params.iter().for_each(|(_, type_str)| {
-                            let codegen_type = get_type_from_name(type_str);
+                            let codegen_type =
+                                get_type_from_name(type_str, &self.module);
                             signature.params.push(AbiParam::new(codegen_type));
                         });
 
                         if let Some(return_) = return_type {
                             signature.returns.push(AbiParam::new(
-                                get_type_from_name(return_.as_ref()),
+                                get_type_from_name(
+                                    return_.as_ref(),
+                                    &self.module,
+                                ),
                             ));
                         }
 
@@ -132,6 +136,7 @@ impl<T: Backend> Compiler<T> {
 
                         let mut function_translator = FunctionTranslator::new(
                             &mut builder,
+                            &mut self.data_context,
                             &mut self.environment_stack,
                             &mut self.function_stack,
                             &mut self.module,

@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 pub use compile::*;
 pub use function_translator::*;
-pub use module::*;
+pub(crate) use module::*;
 pub use rox_result::*;
 pub use semant::*;
 pub use stack::*;
