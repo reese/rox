@@ -4,7 +4,7 @@
 //! This module is the executable module for the Rox roxc.
 extern crate rox;
 
-use rox::build_file;
+use rox::{build_file, run_file};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -40,9 +40,7 @@ fn main() {
             file,
             output,
             no_link,
-        } => {
-            build_file(file, output, no_link).unwrap();
-        }
-        Roxc::Run { .. } => todo!(),
+        } => build_file(file, output, no_link).unwrap(),
+        Roxc::Run { file } => run_file(file).unwrap(),
     }
 }

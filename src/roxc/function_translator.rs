@@ -2,24 +2,23 @@ use crate::roxc::semant::tagged_syntax::TaggedExpression;
 use crate::roxc::tagged_syntax::TaggedStatement;
 use crate::roxc::{syntax, FunctionDeclaration, Param, RoxType, Stack};
 use cranelift::prelude::*;
-use cranelift_module::{Linkage, Module};
-use cranelift_object::ObjectBackend;
+use cranelift_module::{Backend, Linkage, Module};
 use im::HashMap;
 use std::borrow::Borrow;
 
-pub struct FunctionTranslator<'func> {
+pub struct FunctionTranslator<'func, T: Backend> {
     builder: &'func mut FunctionBuilder<'func>,
     pub variables: &'func mut Stack<HashMap<String, Variable>>,
     pub functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
-    pub module: &'func mut Module<ObjectBackend>,
+    pub module: &'func mut Module<T>,
 }
 
-impl<'func> FunctionTranslator<'func> {
+impl<'func, T: Backend> FunctionTranslator<'func, T> {
     pub fn new(
         builder: &'func mut FunctionBuilder<'func>,
         variables: &'func mut Stack<HashMap<String, Variable>>,
         functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
-        module: &'func mut Module<ObjectBackend>,
+        module: &'func mut Module<T>,
     ) -> Self {
         FunctionTranslator {
             builder,

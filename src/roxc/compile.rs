@@ -1,4 +1,4 @@
-use std::{io, str};
+use std::str;
 
 use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
@@ -8,43 +8,29 @@ use crate::roxc::{
 use cranelift::codegen;
 use cranelift::prelude::*;
 use cranelift_codegen::isa::CallConv;
-use cranelift_module::{default_libcall_names, DataContext, Linkage, Module};
-use cranelift_object::{ObjectBackend, ObjectBuilder};
+use cranelift_module::{Backend, DataContext, Linkage, Module};
 use im::HashMap;
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ErrorRecovery;
 use std::borrow::Borrow;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-use target_lexicon::Triple;
 
 lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
 
 type LalrpopParseError<'input> =
     ErrorRecovery<usize, Token<'input>, &'static str>;
 
-pub struct Compiler {
+pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
     #[allow(dead_code)]
     // This will be used when we handle strings and other data types
     data_context: DataContext,
-    module: Module<ObjectBackend>,
+    module: Module<T>,
     environment_stack: Stack<HashMap<String, Variable>>,
     function_stack: Stack<HashMap<String, FunctionDeclaration>>,
 }
 
-impl Compiler {
-    pub fn new() -> Self {
-        let mut flags_builder = cranelift::codegen::settings::builder();
-        flags_builder.enable("is_pic").unwrap();
-        flags_builder.enable("enable_verifier").unwrap();
-        let flags = settings::Flags::new(flags_builder);
-        let isa = codegen::isa::lookup(Triple::host()).unwrap().finish(flags);
-
-        // I'm not _totally_ sure what this second option does
-        let builder = ObjectBuilder::new(isa, "roxc", default_libcall_names());
-        let module = cranelift_module::Module::new(builder);
+impl<T: Backend> Compiler<T> {
+    pub fn new(module: Module<T>) -> Self {
         let mut environment_stack = Stack::new();
         environment_stack.push(HashMap::new());
         let mut function_stack = Stack::new();
@@ -69,12 +55,8 @@ impl Compiler {
         }
     }
 
-    pub fn finish(self, output: impl AsRef<Path>) -> io::Result<()> {
-        let product = self.module.finish();
-        let bytes = product.emit().unwrap();
-        File::create(output)?
-            .write_all(&bytes)
-            .map_err(io::Error::into)
+    pub fn finish(self) -> T::Product {
+        self.module.finish()
     }
 
     fn parse_source_code<'a>(
