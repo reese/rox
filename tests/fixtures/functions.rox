@@ -8,5 +8,5 @@ fn main () {
     let nine = three + 6;
     1.1 + 2.4;
     let x = "test";
-    return;
+    puts(x);
 }

@@ -30,11 +30,11 @@ harness = false
 lalrpop = { version = "0.18.1", features = ["lexer"] }
 
 [dependencies]
-cranelift = "0.63"
-cranelift-codegen = "0.63"
-cranelift-module = "0.63"
-cranelift-object = "0.63"
-cranelift-simplejit = "0.63"
+cranelift = "0.65"
+cranelift-codegen = "0.65"
+cranelift-module = "0.65"
+cranelift-object = "0.65"
+cranelift-simplejit = "0.65"
 im = "14.3.0"
 lalrpop-util = "0.18.1"
 regex = "1"

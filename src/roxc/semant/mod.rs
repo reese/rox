@@ -18,21 +18,24 @@
 //! the implementation of Rox's lexer.
 
 pub(crate) mod tagged_syntax;
-mod types;
+pub(crate) mod types;
 use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
 };
-use crate::roxc::{syntax, Declaration, Expression, RoxType, Statement};
+use crate::roxc::{
+    get_builtin_types, syntax, Declaration, Expression, RoxType, Statement,
+};
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 pub use types::ArenaType;
 use types::*;
 
-pub const NUMBER_TYPE_VAL: ArenaType = 0;
-pub const BOOL_TYPE_VAL: ArenaType = 1;
-pub const STRING_TYPE_VAL: ArenaType = 2;
+pub const VOID_TYPE_VAL: ArenaType = 0;
+pub const NUMBER_TYPE_VAL: ArenaType = 1;
+pub const BOOL_TYPE_VAL: ArenaType = 2;
+pub const STRING_TYPE_VAL: ArenaType = 3;
 
-type Env = HashMap<String, ArenaType>;
+pub(crate) type Env = HashMap<String, ArenaType>;
 
 pub(crate) fn analyse_program(
     declarations: &[Declaration],
@@ -53,19 +56,6 @@ pub(crate) fn analyse_program(
             TaggedDeclaration::Function(tagged_statement)
         })
         .collect::<Vec<_>>()
-}
-
-fn get_builtin_types() -> (Vec<Type>, Env) {
-    let initial_types = vec![NUMBER_TYPE_VAL, BOOL_TYPE_VAL, STRING_TYPE_VAL];
-    let mut env = HashMap::new();
-    env.insert(String::from("number"), NUMBER_TYPE_VAL);
-    env.insert(String::from("bool"), BOOL_TYPE_VAL);
-    env.insert(String::from("str"), STRING_TYPE_VAL);
-    let types = initial_types
-        .iter()
-        .map(|arena_type| Type::new_variable(*arena_type))
-        .collect();
-    (types, env)
 }
 
 fn analyse_statement(
@@ -294,7 +284,10 @@ fn analyse_expression(
                 TaggedExpression::FunctionCall(
                     name,
                     tagged_arg_expressions,
-                    RoxType::from(return_types[0]),
+                    return_types
+                        .get(0)
+                        .map(|t| RoxType::from(*t))
+                        .unwrap_or(RoxType::Void),
                 )
             // TODO: ^^ This will probably need to be refactored to support multiple returns
             // since functions no longer resolve to one value}

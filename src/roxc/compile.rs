@@ -21,8 +21,6 @@ type LalrpopParseError<'input> =
 
 pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
-    #[allow(dead_code)]
-    // This will be used when we handle strings and other data types
     data_context: DataContext,
     module: Module<T>,
     environment_stack: Stack<HashMap<String, Variable>>,
@@ -35,6 +33,14 @@ impl<T: Backend> Compiler<T> {
         environment_stack.push(HashMap::new());
         let mut function_stack = Stack::new();
         function_stack.push(HashMap::new());
+        function_stack.top_mut().insert(
+            "puts".to_string(),
+            FunctionDeclaration {
+                name: "puts".to_string(),
+                params: vec![("arg".to_string(), "str".to_string())],
+                return_type: None,
+            },
+        );
 
         Compiler {
             function_builder_context: FunctionBuilderContext::new(),

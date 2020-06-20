@@ -42,6 +42,7 @@ pub enum Unary {
 
 #[derive(Clone, Debug)]
 pub enum RoxType {
+    Void,
     Bool,
     Number,
     String,
@@ -63,6 +64,7 @@ impl From<ArenaType> for RoxType {
 impl Into<ArenaType> for RoxType {
     fn into(self) -> usize {
         match self {
+            RoxType::Void => semant::VOID_TYPE_VAL,
             RoxType::Number => semant::NUMBER_TYPE_VAL,
             RoxType::Bool => semant::BOOL_TYPE_VAL,
             RoxType::String => semant::STRING_TYPE_VAL,

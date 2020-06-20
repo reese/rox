@@ -39,6 +39,14 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         self.initialize_block(params);
         self.translate_block(block);
 
+        // Add return if block doesn't have a return statement
+        if !block.iter().any(|statement| match **statement {
+            TaggedStatement::Return(_) => true,
+            _ => false,
+        }) {
+            self.builder.ins().return_(&[]);
+        }
+
         self.builder.finalize();
     }
 
@@ -277,6 +285,7 @@ fn get_codegen_type<T: Backend>(
     module: &Module<T>,
 ) -> types::Type {
     match rox_type {
+        RoxType::Void => types::INVALID,
         RoxType::Bool => types::B1,
         RoxType::Number => types::F64,
         RoxType::String => module.target_config().pointer_type(),
