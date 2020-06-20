@@ -3,7 +3,7 @@ use std::str;
 use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
     analyse_program, get_type_from_name, Declaration, FunctionDeclaration,
-    FunctionTranslator, RoxError, RoxResult, Stack,
+    FunctionTranslator, Result, RoxError, Stack,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
@@ -13,6 +13,8 @@ use im::HashMap;
 use lalrpop_util::lexer::Token;
 use lalrpop_util::ErrorRecovery;
 use std::borrow::Borrow;
+use std::fs::read_to_string;
+use std::path::PathBuf;
 
 lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
 
@@ -51,13 +53,18 @@ impl<T: Backend> Compiler<T> {
         }
     }
 
-    pub fn compile(&mut self, source: &str) -> RoxResult<()> {
-        match self.parse_source_code(source) {
-            Err(errors) => {
-                println!("{:?}", errors);
-                RoxError::compile_error()
-            } // TODO: Properly convert errors
+    pub fn compile(
+        &mut self,
+        file: impl Into<PathBuf> + std::clone::Clone,
+    ) -> Result<Vec<()>> {
+        let source = read_to_string(file.clone().into()).unwrap();
+        let declarations_result = self.parse_source_code(source.as_ref());
+        match declarations_result {
             Ok(declarations) => self.compile_declarations(&declarations),
+            Err(parse_errors) => Err(RoxError::from_parse_error(
+                &parse_errors.first().unwrap().error,
+                file.into(),
+            )),
         }
     }
 
@@ -68,7 +75,7 @@ impl<T: Backend> Compiler<T> {
     fn parse_source_code<'a>(
         &'a self,
         source: &'a str,
-    ) -> Result<Vec<Declaration>, Vec<LalrpopParseError>> {
+    ) -> std::result::Result<Vec<Declaration>, Vec<LalrpopParseError>> {
         let mut errors = Vec::new();
         let declarations = rox_parser::ProgramParser::new()
             .parse(&mut errors, source)
@@ -82,18 +89,18 @@ impl<T: Backend> Compiler<T> {
     fn compile_declarations(
         &mut self,
         declarations: &[Declaration],
-    ) -> RoxResult<()> {
+    ) -> Result<Vec<()>> {
         let tagged_declarations = analyse_program(declarations);
-        tagged_declarations.iter().for_each(|declaration| {
-            self.translate_declaration(declaration).unwrap();
-        });
-        Ok(())
+        tagged_declarations
+            .iter()
+            .map(|declaration| self.translate_declaration(declaration))
+            .collect()
     }
 
     pub(crate) fn translate_declaration(
         &mut self,
         declaration: &TaggedDeclaration,
-    ) -> RoxResult<()> {
+    ) -> Result<()> {
         match declaration {
             TaggedDeclaration::Function(func_declaration) => {
                 let mut codegen_context = self.module.make_context();

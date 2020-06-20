@@ -35,12 +35,15 @@ enum Roxc {
 /// This is the executable for running the Rox roxc.
 fn main() {
     let args = Roxc::from_args();
-    match args {
+    let result = match args {
         Roxc::Build {
             file,
             output,
             no_link,
-        } => build_file(file, output, no_link).unwrap(),
-        Roxc::Run { file } => run_file(file).unwrap(),
+        } => build_file(file, output, no_link),
+        Roxc::Run { file } => run_file(file),
+    };
+    if result.is_err() {
+        result.err().unwrap().emit_error().unwrap();
     }
 }

@@ -30,7 +30,7 @@ harness = false
 lalrpop = { version = "0.18.1", features = ["lexer"] }
 
 [dependencies]
-color-eyre = "0.3.4"
+codespan-reporting = "0.9.4"
 cranelift = "0.65"
 cranelift-codegen = "0.65"
 cranelift-module = "0.65"
