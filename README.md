@@ -1,5 +1,6 @@
 ![Rox Logo](./assets/rox-banner.png)
 
+[![](https://meritbadge.herokuapp.com/rox-lang)](https://crates.io/crates/rox-lang)
 ![Build](https://github.com/reese/rox/workflows/Build/badge.svg)
 ![Security audit](https://github.com/reese/rox/workflows/Security%20audit/badge.svg)
 
