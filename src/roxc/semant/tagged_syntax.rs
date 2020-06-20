@@ -46,9 +46,9 @@ type TaggedBlock = Vec<Box<TaggedStatement>>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TaggedStatement {
+    Block(TaggedBlock),
     Expression(TaggedExpression),
     Return(Option<TaggedExpression>),
-    #[allow(dead_code)]
     IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
     FunctionDeclaration(FunctionDeclaration, TaggedBlock),
 }

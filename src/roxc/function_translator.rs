@@ -93,16 +93,14 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
                 let mut signature = self.module.make_signature();
                 params.iter().for_each(|(_, type_name)| {
-                    signature.params.push(AbiParam::new(get_type_from_name(
-                        type_name,
-                        self.module,
-                    )));
+                    signature
+                        .params
+                        .push(AbiParam::new(get_type_from_name(type_name)));
                 });
                 if let Some(return_) = return_type {
-                    signature.returns.push(AbiParam::new(get_type_from_name(
-                        return_,
-                        self.module,
-                    )));
+                    signature
+                        .returns
+                        .push(AbiParam::new(get_type_from_name(return_)));
                 }
 
                 let callee = self
@@ -134,9 +132,17 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             String(string) => {
                 self.data_context
                     .define(string.clone().into_bytes().into_boxed_slice());
+                let mut string_name = string.clone();
+                string_name.push_str("__RUST_STRING_DO_NOT_TOUCH__");
                 let id = self
                     .module
-                    .declare_data(string, Linkage::Export, false, false, None)
+                    .declare_data(
+                        string_name.as_ref(),
+                        Linkage::Export,
+                        false,
+                        false,
+                        None,
+                    )
                     .unwrap();
                 self.module.define_data(id, &self.data_context).unwrap();
                 let value =
@@ -173,6 +179,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 let lval = self.translate_expression(left)[0];
                 let rval = self.translate_expression(right)[0];
                 let result = match operation {
+                    Concat => self.builder.ins().vconcat(lval, rval),
                     Add => self.builder.ins().fadd(lval, rval),
                     Subtract => self.builder.ins().fsub(lval, rval),
                     Multiply => self.builder.ins().fmul(lval, rval),
@@ -228,7 +235,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             let variable = Variable::new(index);
             self.variables.top_mut().insert(name, variable);
             self.builder
-                .declare_var(variable, get_type_from_name(&type_, self.module));
+                .declare_var(variable, get_type_from_name(&type_));
             self.builder.def_var(variable, *param);
         });
     }
@@ -239,12 +246,14 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     ) -> Type {
         use TaggedExpression::*;
         match tagged_expression {
-            String(_) => get_codegen_type(&RoxType::String, self.module),
-            Number(_) | Operation(_, _, _) | Unary(_, _) => {
-                get_codegen_type(&RoxType::Number, self.module)
-            }
-            Boolean(_) => get_codegen_type(&RoxType::Bool, &self.module),
-            And(_, _) => get_codegen_type(&RoxType::Bool, self.module),
+            String(_) => get_codegen_type(&RoxType::String),
+            Number(_) | Unary(_, _) => get_codegen_type(&RoxType::Number),
+            Operation(_, operation, _) => match operation {
+                syntax::Operation::Concat => get_codegen_type(&RoxType::String),
+                _ => get_codegen_type(&RoxType::Number),
+            },
+            Boolean(_) => get_codegen_type(&RoxType::Bool),
+            And(_, _) => get_codegen_type(&RoxType::Bool),
             Assignment(_, expression) => self.get_expression_type(expression),
             FunctionCall(name, _, _rox_type) => {
                 let declaration = self.functions.top().get(name).unwrap();
@@ -252,9 +261,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 return_type
                     .as_ref()
                     // `INVALID` is just `VOID`
-                    .map_or(types::INVALID, |t| {
-                        get_type_from_name(t.as_ref(), self.module)
-                    })
+                    .map_or(types::INVALID, |t| get_type_from_name(t.as_ref()))
             }
             x => {
                 dbg!(x);
@@ -264,10 +271,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     }
 }
 
-pub(crate) fn get_type_from_name<T: Backend>(
-    type_str: &str,
-    module: &Module<T>,
-) -> Type {
+pub(crate) fn get_type_from_name(type_str: &str) -> Type {
     let rox_type = match type_str {
         "bool" => RoxType::Bool,
         "number" => RoxType::Number,
@@ -277,17 +281,14 @@ pub(crate) fn get_type_from_name<T: Backend>(
             unimplemented!()
         }
     };
-    get_codegen_type(&rox_type, module)
+    get_codegen_type(&rox_type)
 }
 
-fn get_codegen_type<T: Backend>(
-    rox_type: &RoxType,
-    module: &Module<T>,
-) -> types::Type {
+fn get_codegen_type(rox_type: &RoxType) -> types::Type {
     match rox_type {
         RoxType::Void => types::INVALID,
         RoxType::Bool => types::B1,
         RoxType::Number => types::F64,
-        RoxType::String => module.target_config().pointer_type(),
+        RoxType::String => types::I64X2,
     }
 }

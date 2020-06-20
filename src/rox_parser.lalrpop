@@ -24,6 +24,7 @@ Statement: Box<Statement> = {
     <Expression> ";" => Box::new(Statement::Expression(<>)),
     <ReturnStatement>,
     <Function> ";",
+    "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
     <Block> ";" => Box::new(Statement::Block(<>)),
 }
 
@@ -64,6 +65,8 @@ Comparison: Box<Expression> = {
     Addition
 }
 
+// TODO: support multiple operators one after another
+// TODO: i.e. support `1 + 2 + 3` or ``"this" ^ " is a " ^ "string"`
 Addition: Box<Expression> = {
     Multiplication AdditionOp Multiplication => Box::new(Expression::Operation(<>)),
     Multiplication
@@ -82,6 +85,11 @@ Unary: Box<Expression> = {
 
 Call: Box<Expression> = {
     <i: Identifier> "(" <args: (Arguments)?> ")" => Box::new(Expression::FunctionCall(i, args.unwrap_or(Vec::new()))),
+    Concat
+}
+
+Concat: Box<Expression> = {
+    Primary ConcatOp Primary => Box::new(Expression::Operation(<>)),
     Primary
 }
 
@@ -130,6 +138,10 @@ AdditionOp: Operation = {
     "-" => Operation::Subtract,
 };
 
+ConcatOp: Operation = {
+    "^" => Operation::Concat
+}
+
 Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
     Num => Box::new(Expression::Number(<>)),
@@ -156,5 +168,5 @@ Num: f64 = {
 };
 
 String: String = {
-    r#""[^"]*""# => String::from(<>)
+    r#""[^"]*""# => <>.chars().skip(1).take(<>.len()-2).collect::<String>()
 }

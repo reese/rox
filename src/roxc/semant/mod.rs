@@ -23,7 +23,8 @@ use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
 };
 use crate::roxc::{
-    get_builtin_types, syntax, Declaration, Expression, RoxType, Statement,
+    get_builtin_types, syntax, Declaration, Expression, Operation, RoxType,
+    Statement,
 };
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
@@ -66,10 +67,31 @@ fn analyse_statement(
 ) -> TaggedStatement {
     use Statement::*;
     match node {
+        Block(block) => TaggedStatement::Block(analyse_block(
+            types,
+            env,
+            non_generic,
+            block,
+        )),
         Expression(expression) => {
             let tagged_expression =
                 analyse_expression(types, *expression, env, non_generic);
             TaggedStatement::Expression(tagged_expression)
+        }
+        IfElse(if_expression, if_block, else_block) => {
+            let tagged_if =
+                analyse_expression(types, *if_expression, env, non_generic);
+            unify(types, BOOL_TYPE_VAL, tagged_if.clone().into());
+            let tagged_if_block =
+                analyse_block(types, env, non_generic, if_block);
+            let tagged_else_block = else_block
+                .map(|block| analyse_block(types, env, non_generic, block));
+
+            TaggedStatement::IfElse(
+                Box::from(tagged_if),
+                tagged_if_block,
+                tagged_else_block,
+            )
         }
         FunctionDeclaration(name, params, return_type, statements) => {
             let param_types: Vec<(String, usize)> =
@@ -134,8 +156,33 @@ fn analyse_statement(
             };
             TaggedStatement::FunctionDeclaration(declaration, tagged_block)
         }
-        _ => panic!(""),
+        Return(maybe_expression) => {
+            let maybe_tagged_return = maybe_expression
+                .map(|exp| analyse_expression(types, *exp, env, non_generic));
+            TaggedStatement::Return(maybe_tagged_return)
+        }
     }
+}
+
+#[allow(clippy::vec_box)]
+fn analyse_block(
+    types: &mut Vec<Type>,
+    env: &mut HashMap<String, usize>,
+    non_generic: &HashSet<usize>,
+    if_block: Vec<Box<Statement>>,
+) -> Vec<Box<TaggedStatement>> {
+    let mut scoped_env = env.clone();
+    if_block
+        .iter()
+        .map(|statement| {
+            Box::new(analyse_statement(
+                types,
+                *statement.clone(),
+                &mut scoped_env,
+                non_generic,
+            ))
+        })
+        .collect::<Vec<_>>()
 }
 
 fn get_arg_types(
@@ -162,12 +209,13 @@ fn get_param_types(
         .iter()
         .map(|(param_name, param_type_name)| {
             let variable = new_variable(types);
-            let param_arena_type = env.get(param_type_name.as_str()).unwrap();
+            let param_arena_type = *env.get(param_type_name.as_str()).unwrap();
+            env.insert(param_name.to_string(), param_arena_type);
             types.push(Type::Variable {
                 id: variable,
-                instance: Some(*param_arena_type),
+                instance: Some(param_arena_type),
             });
-            (param_name.clone(), *param_arena_type)
+            (param_name.clone(), param_arena_type)
         })
         .collect::<Vec<_>>()
 }
@@ -187,7 +235,9 @@ fn analyse_expression(
             TaggedExpression::Assignment(name, Box::new(tagged_expression))
         }
         Expression::Identifier(ref name) => {
-            let arena_type = env.get(name).unwrap();
+            let arena_type = env
+                .get(name)
+                .unwrap_or_else(|| panic!("Unexpected identifier: {}", name));
             TaggedExpression::Identifier(
                 name.clone(),
                 RoxType::from(*arena_type),
@@ -236,8 +286,32 @@ fn analyse_expression(
                 analyse_expression(types, *left, env, non_generic);
             let right_expression =
                 analyse_expression(types, *right, env, non_generic);
-            unify(types, left_expression.clone().into(), NUMBER_TYPE_VAL);
-            unify(types, right_expression.clone().into(), NUMBER_TYPE_VAL);
+            match operation {
+                Operation::Concat => {
+                    unify(
+                        types,
+                        left_expression.clone().into(),
+                        STRING_TYPE_VAL,
+                    );
+                    unify(
+                        types,
+                        right_expression.clone().into(),
+                        STRING_TYPE_VAL,
+                    );
+                }
+                _ => {
+                    unify(
+                        types,
+                        left_expression.clone().into(),
+                        NUMBER_TYPE_VAL,
+                    );
+                    unify(
+                        types,
+                        right_expression.clone().into(),
+                        NUMBER_TYPE_VAL,
+                    );
+                }
+            }
             TaggedExpression::Operation(
                 left_expression.into(),
                 operation,

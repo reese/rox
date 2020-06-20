@@ -22,6 +22,8 @@ pub type Param = (String, String);
 
 #[derive(Clone, Debug)]
 pub enum Operation {
+    Concat,
+
     Equals,
     NotEquals,
     GreaterThan,
@@ -84,7 +86,6 @@ pub enum Statement {
     Expression(Box<Expression>),
     Return(Option<Box<Expression>>),
     Block(Block),
-    #[allow(dead_code)]
     IfElse(Box<Expression>, Block, Option<Block>),
     FunctionDeclaration(String, Vec<Param>, Option<String>, Block),
 }

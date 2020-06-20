@@ -22,7 +22,7 @@ type LalrpopParseError<'input> =
 pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
     data_context: DataContext,
-    pub module: Module<T>,
+    pub(crate) module: Module<T>,
     environment_stack: Stack<HashMap<String, Variable>>,
     function_stack: Stack<HashMap<String, FunctionDeclaration>>,
 }
@@ -109,17 +109,13 @@ impl<T: Backend> Compiler<T> {
                         } = func_declaration;
                         let mut signature = Signature::new(CallConv::SystemV);
                         params.iter().for_each(|(_, type_str)| {
-                            let codegen_type =
-                                get_type_from_name(type_str, &self.module);
+                            let codegen_type = get_type_from_name(type_str);
                             signature.params.push(AbiParam::new(codegen_type));
                         });
 
                         if let Some(return_) = return_type {
                             signature.returns.push(AbiParam::new(
-                                get_type_from_name(
-                                    return_.as_ref(),
-                                    &self.module,
-                                ),
+                                get_type_from_name(return_.as_ref()),
                             ));
                         }
 
