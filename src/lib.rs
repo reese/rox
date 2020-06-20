@@ -16,6 +16,8 @@ extern crate lalrpop_util;
 mod roxc;
 
 use crate::roxc::{init_object_module, init_simplejit_module, Compiler};
+use core::mem;
+use cranelift_module::FuncOrDataId;
 use roxc::{RoxError, RoxErrorType, RoxResult};
 use std::env::temp_dir;
 use std::fs;
@@ -39,6 +41,12 @@ pub fn build_file(
     no_link: bool,
 ) -> std::io::Result<()> {
     let source = fs::read_to_string(path)?;
+    build_source_string(output, no_link, &source);
+    Ok(())
+}
+
+/// Builds the given source string and links to the output file
+pub fn build_source_string(output: PathBuf, no_link: bool, source: &str) {
     let result = compile_and_maybe_link(&source, output, no_link);
     match result {
         Err(RoxError { error_type, .. })
@@ -59,7 +67,19 @@ pub fn run_file(path: PathBuf) -> std::io::Result<()> {
     let source = fs::read_to_string(path)?;
     let mut compiler = Compiler::new(init_simplejit_module());
     compiler.compile(source.as_ref()).unwrap();
-    compiler.finish();
+    let Compiler { mut module, .. } = compiler;
+    let func_id = module.get_name("main").unwrap();
+    // TODO: Handle `argc` and `argv` in `main`
+    // TODO: Actually return the result of this.
+    // TODO: Could this unsafe block be pushed into `SimpleJITBackend`?
+    match func_id {
+        FuncOrDataId::Func(func) => {
+            let main_func = module.get_finalized_function(func);
+            let main = unsafe { mem::transmute::<_, fn() -> isize>(main_func) };
+            main();
+        }
+        _ => panic!("Pointer returned for `main` was not a function."),
+    }
     Ok(())
 }
 

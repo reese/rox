@@ -22,7 +22,7 @@ type LalrpopParseError<'input> =
 pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
     data_context: DataContext,
-    module: Module<T>,
+    pub module: Module<T>,
     environment_stack: Stack<HashMap<String, Variable>>,
     function_stack: Stack<HashMap<String, FunctionDeclaration>>,
 }
