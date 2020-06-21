@@ -1,9 +1,23 @@
 extern crate rox;
 
-use std::path::PathBuf;
-
 fn run_functions_compilation() -> rox::Result<()> {
-    rox::run_file(PathBuf::from("tests/fixtures/functions.rox"))
+    rox::execute_source_string(
+        r#"
+    fn test (x: number) -> number {
+        if x == 9 {
+            return x + 1;
+        }
+        return 4 + 5;
+    }
+
+    fn main () {
+        let ten = test(9);
+        let nine = test(1234);
+        let three = ten - 7;
+        let x = "Hello, world!";
+        puts(x);
+    }"#,
+    )
 }
 
 #[test]

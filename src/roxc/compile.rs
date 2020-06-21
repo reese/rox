@@ -98,7 +98,7 @@ impl<T: Backend> Compiler<T> {
             .collect()
     }
 
-    pub(crate) fn translate_declaration(
+    fn translate_declaration(
         &mut self,
         declaration: &TaggedDeclaration,
     ) -> Result<()> {

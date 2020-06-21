@@ -16,14 +16,18 @@ extern crate lalrpop_util;
 mod roxc;
 
 pub use crate::roxc::Result;
-use crate::roxc::{init_object_module, init_simplejit_module, Compiler};
+use crate::roxc::{
+    init_object_module, init_simplejit_module, Compiler, RoxError,
+};
+use codespan_reporting::files::SimpleFile;
 use core::mem;
 use cranelift_module::FuncOrDataId;
 use std::env::temp_dir;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output};
 
 /// `run_file` reads the contents of the given path
 /// and runs them through the roxc.
@@ -44,7 +48,12 @@ pub fn build_source_string(
     no_link: bool,
     source: PathBuf,
 ) -> Result<()> {
-    compile_and_maybe_link(source, output, no_link)
+    if no_link {
+        compile_file(source, output)
+    } else {
+        compile_and_link(source, output).unwrap();
+        Ok(())
+    }
 }
 
 /// Run the given file with the SimpleJITBackend
@@ -72,39 +81,73 @@ pub fn run_file(path: PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Executes the raw source string with the JIT compiler.
+/// ```
+/// use rox::execute_source_string;
+/// let source = r#"
+/// fn main() {
+///     puts("Hello, world!");
+/// }
+/// "#;
+/// execute_source_string(source);
+/// ```
+pub fn execute_source_string(source: &str) -> Result<()> {
+    let mut mock_file = temp_dir();
+    mock_file.push("temp.rox");
+    let mut file = File::create(&mock_file).unwrap();
+    file.write_all(source.as_bytes()).unwrap();
+    run_file(mock_file)
+}
+
 /// This function generates the native object file
-/// and optionally (see the `no_link` argument) links
-/// it using the machine's default C compiler.
-fn compile_and_maybe_link(
-    input_file: PathBuf,
-    output: PathBuf,
-    no_link: bool,
-) -> Result<()> {
+/// and links it using the machine's default C compiler.
+fn compile_and_link(input_file: PathBuf, output: PathBuf) -> Result<Output> {
+    let temp = create_temp_object_file();
+    match compile_file(input_file, temp.clone()) {
+        Err(err) => Err(err),
+        Ok(_) => link_file(temp, output),
+    }
+}
+
+fn compile_file<T>(input_file: T, object_file_output: T) -> Result<()>
+where
+    T: Into<PathBuf> + Sized,
+{
     let mut compiler = Compiler::new(init_object_module());
-    match compiler.compile(input_file) {
+    match compiler.compile(input_file.into()) {
         Err(err) => Err(err),
         Ok(_) => {
             let product = compiler.finish();
             let bytes = product.emit().unwrap();
-            if !no_link {
-                let temp_output_file = create_temp_object_file();
-                let file_result = File::create(temp_output_file.clone())
-                    .unwrap()
-                    .write_all(&bytes);
-                Command::new("cc")
-                    .arg(temp_output_file.into_os_string())
-                    .arg("-o")
-                    .arg(output)
-                    .output()
-                    .expect("Failed to link output file.");
-                file_result.unwrap();
-                Ok(())
-            } else {
-                File::create(output).unwrap().write_all(&bytes).unwrap();
-                Ok(())
-            }
+            File::create(object_file_output.into())
+                .unwrap()
+                .write(&bytes)
+                .unwrap();
+            Ok(())
         }
     }
+}
+
+fn link_file<T: Into<OsString> + Clone>(
+    file_to_link: T,
+    output_file: T,
+) -> Result<Output> {
+    Command::new("cc")
+        .arg(file_to_link.clone().into())
+        .arg("-o")
+        .arg(output_file.into())
+        .output()
+        .map_err(|err| RoxError {
+            file: SimpleFile::new(
+                file_to_link.clone().into().into_string().unwrap(),
+                file_to_link.into().into_string().unwrap(),
+            ),
+            message: Some(String::from(
+                "Failed to link file due to unexpected error.",
+            )),
+            labels: vec![],
+            notes: vec![err.to_string()],
+        })
 }
 
 fn create_temp_object_file() -> PathBuf {

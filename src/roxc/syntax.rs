@@ -89,6 +89,10 @@ pub enum Statement {
 }
 
 #[derive(Debug)]
+/// Declarations are top-level statements that define a function or data type.
+/// As of now, declarations cannot happen inside other declarations, i.e.
+/// you cannot define a function inside of a function.
+/// This should be changed in future versions of Rox.
 pub enum Declaration {
     // TODO: Allow user defined types
     // Record(Vec<Field>),

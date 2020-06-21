@@ -344,10 +344,7 @@ fn analyse_expression(
                 panic!("Type mismatch: tried to call an object that is not a function")
             }
         }
-        x => {
-            println!("Got type: {:?}", x);
-            panic!("This shouldn't have happened?");
-        }
+        Expression::ParseError => panic!("Encountered errors while parsing, cannot type check invalid syntax."),
     }
 }
 

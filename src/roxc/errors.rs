@@ -25,10 +25,10 @@ fn clean_expected(expected: &[String]) -> Vec<String> {
 
 #[derive(Clone, Debug)]
 pub struct RoxError {
-    file: SimpleFile<String, String>,
-    message: Option<String>,
-    labels: Vec<Label<()>>,
-    notes: Vec<String>,
+    pub file: SimpleFile<String, String>,
+    pub message: Option<String>,
+    pub labels: Vec<Label<()>>,
+    pub notes: Vec<String>,
 }
 
 impl RoxError {
