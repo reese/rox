@@ -344,6 +344,7 @@ fn analyse_expression(
                 panic!("Type mismatch: tried to call an object that is not a function")
             }
         }
+        Expression::Array(_) => todo!(),
         Expression::ParseError => panic!("Encountered errors while parsing, cannot type check invalid syntax."),
     }
 }

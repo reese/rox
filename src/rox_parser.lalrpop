@@ -139,6 +139,7 @@ Primary: Box<Expression> = {
     String => Box::new(Expression::String(<>)),
     Identifier => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
+    "[" <Comma<Expression>> "]" => Box::new(Expression::Array(<>)),
     ! => {
         errors.push(<>);
         Box::new(Expression::ParseError)
@@ -161,3 +162,14 @@ Num: f64 = {
 String: String = {
     r#""[^"]*""# => <>.chars().skip(1).take(<>.len()-2).collect::<String>()
 }
+
+Comma<T>: Vec<T> = { // (1)
+    <v:(<T> ",")*> <e:T?> => match e { // (2)
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};

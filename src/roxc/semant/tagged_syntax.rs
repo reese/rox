@@ -13,6 +13,8 @@ use crate::roxc::{
 #[derive(Clone, Debug)]
 pub enum TaggedExpression {
     And(Box<TaggedExpression>, Box<TaggedExpression>),
+    #[allow(dead_code, clippy::vec_box)]
+    Array(Vec<Box<TaggedExpression>>),
     Assignment(String, Box<TaggedExpression>),
     Boolean(bool),
     #[allow(clippy::vec_box)]
@@ -38,6 +40,7 @@ impl Into<ArenaType> for TaggedExpression {
             Number(_) | Operation(_, _, _) | Unary(_, _) => NUMBER_TYPE_VAL,
             String(_) => STRING_TYPE_VAL,
             Variable(_, expression) => (*expression).into(),
+            Array(_) => todo!(),
         }
     }
 }
@@ -57,5 +60,3 @@ pub(crate) enum TaggedStatement {
 pub(crate) enum TaggedDeclaration {
     Function(TaggedStatement),
 }
-
-impl TaggedDeclaration {}

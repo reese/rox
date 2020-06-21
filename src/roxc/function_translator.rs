@@ -309,9 +309,9 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
 pub(crate) fn get_type_from_name(type_str: &str) -> Type {
     let rox_type = match type_str {
-        "bool" => RoxType::Bool,
-        "number" => RoxType::Number,
-        "str" => RoxType::String,
+        "Bool" => RoxType::Bool,
+        "Number" => RoxType::Number,
+        "String" => RoxType::String,
         x => {
             dbg!(x);
             unimplemented!()

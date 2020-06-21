@@ -40,7 +40,7 @@ impl<T: Backend> Compiler<T> {
             "puts".to_string(),
             FunctionDeclaration {
                 name: "puts".to_string(),
-                params: vec![("arg".to_string(), "str".to_string())],
+                params: vec![("arg".to_string(), "String".to_string())],
                 return_type: None,
             },
         );

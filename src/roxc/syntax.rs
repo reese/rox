@@ -3,6 +3,7 @@ use crate::roxc::{semant, ArenaType};
 #[derive(Clone, Debug)]
 pub enum Expression {
     And(Box<Expression>, Box<Expression>),
+    Array(Vec<Box<Expression>>),
     Assignment(String, Box<Expression>),
     Boolean(bool),
     #[allow(clippy::vec_box)]

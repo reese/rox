@@ -3,7 +3,7 @@ extern crate rox;
 fn run_functions_compilation() -> rox::Result<()> {
     rox::execute_source_string(
         r#"
-    fn test (x: number) -> number {
+    fn test (x: Number) -> Number {
         if x == 9 {
             return x + 1;
         }
