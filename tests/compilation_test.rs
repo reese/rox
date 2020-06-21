@@ -1,9 +1,8 @@
 extern crate rox;
 
-use color_eyre::Result;
 use std::path::PathBuf;
 
-fn run_functions_compilation() -> Result<()> {
+fn run_functions_compilation() -> rox::Result<()> {
     rox::run_file(PathBuf::from("tests/fixtures/functions.rox"))
 }
 

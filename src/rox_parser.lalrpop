@@ -66,7 +66,7 @@ Comparison: Box<Expression> = {
 }
 
 // TODO: support multiple operators one after another
-// TODO: i.e. support `1 + 2 + 3` or ``"this" ^ " is a " ^ "string"`
+// TODO: i.e. support `1 + 2 + 3`
 Addition: Box<Expression> = {
     Multiplication AdditionOp Multiplication => Box::new(Expression::Operation(<>)),
     Multiplication
@@ -85,11 +85,6 @@ Unary: Box<Expression> = {
 
 Call: Box<Expression> = {
     <i: Identifier> "(" <args: (Arguments)?> ")" => Box::new(Expression::FunctionCall(i, args.unwrap_or(Vec::new()))),
-    Concat
-}
-
-Concat: Box<Expression> = {
-    Primary ConcatOp Primary => Box::new(Expression::Operation(<>)),
     Primary
 }
 
@@ -137,10 +132,6 @@ AdditionOp: Operation = {
     "+" => Operation::Add,
     "-" => Operation::Subtract,
 };
-
-ConcatOp: Operation = {
-    "^" => Operation::Concat
-}
 
 Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),

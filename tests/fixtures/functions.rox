@@ -9,6 +9,6 @@ fn main () {
     let ten = test(9);
     let nine = test(1234);
     let three = ten - 7;
-    let x = "Hello, " ^ "world!";
+    let x = "Hello, world!";
     puts(x);
 }

@@ -15,9 +15,8 @@ extern crate lalrpop_util;
 
 mod roxc;
 
-use crate::roxc::{
-    init_object_module, init_simplejit_module, Compiler, Result,
-};
+pub use crate::roxc::Result;
+use crate::roxc::{init_object_module, init_simplejit_module, Compiler};
 use core::mem;
 use cranelift_module::FuncOrDataId;
 use std::env::temp_dir;

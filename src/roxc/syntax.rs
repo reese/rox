@@ -22,8 +22,6 @@ pub type Param = (String, String);
 
 #[derive(Clone, Debug)]
 pub enum Operation {
-    Concat,
-
     Equals,
     NotEquals,
     GreaterThan,

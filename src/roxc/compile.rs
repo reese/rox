@@ -35,6 +35,7 @@ impl<T: Backend> Compiler<T> {
         environment_stack.push(HashMap::new());
         let mut function_stack = Stack::new();
         function_stack.push(HashMap::new());
+        // TODO: Move this into where we add libc types earlier
         function_stack.top_mut().insert(
             "puts".to_string(),
             FunctionDeclaration {

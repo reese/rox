@@ -5,12 +5,19 @@ use crate::roxc::{
 };
 use std::collections::HashMap;
 
-fn get_libc_types() -> [(String, Vec<ArenaType>, Vec<ArenaType>); 1] {
-    [(
-        "puts".to_string(),
-        vec![STRING_TYPE_VAL],
-        Vec::<ArenaType>::new(),
-    )]
+fn get_libc_types() -> [(String, Vec<ArenaType>, Vec<ArenaType>); 2] {
+    [
+        (
+            "puts".to_string(),
+            vec![STRING_TYPE_VAL],
+            Vec::<ArenaType>::new(),
+        ),
+        (
+            "strcat".to_string(),
+            vec![STRING_TYPE_VAL, STRING_TYPE_VAL],
+            vec![STRING_TYPE_VAL],
+        ),
+    ]
 }
 
 pub(crate) fn get_builtin_types() -> (Vec<Type>, Env) {

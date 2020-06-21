@@ -23,8 +23,7 @@ use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
 };
 use crate::roxc::{
-    get_builtin_types, syntax, Declaration, Expression, Operation, RoxType,
-    Statement,
+    get_builtin_types, syntax, Declaration, Expression, RoxType, Statement,
 };
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
@@ -286,32 +285,8 @@ fn analyse_expression(
                 analyse_expression(types, *left, env, non_generic);
             let right_expression =
                 analyse_expression(types, *right, env, non_generic);
-            match operation {
-                Operation::Concat => {
-                    unify(
-                        types,
-                        left_expression.clone().into(),
-                        STRING_TYPE_VAL,
-                    );
-                    unify(
-                        types,
-                        right_expression.clone().into(),
-                        STRING_TYPE_VAL,
-                    );
-                }
-                _ => {
-                    unify(
-                        types,
-                        left_expression.clone().into(),
-                        NUMBER_TYPE_VAL,
-                    );
-                    unify(
-                        types,
-                        right_expression.clone().into(),
-                        NUMBER_TYPE_VAL,
-                    );
-                }
-            }
+            unify(types, left_expression.clone().into(), NUMBER_TYPE_VAL);
+            unify(types, right_expression.clone().into(), NUMBER_TYPE_VAL);
             TaggedExpression::Operation(
                 left_expression.into(),
                 operation,

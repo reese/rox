@@ -2,7 +2,7 @@ use crate::roxc::semant::tagged_syntax::TaggedExpression;
 use crate::roxc::tagged_syntax::TaggedStatement;
 use crate::roxc::{syntax, FunctionDeclaration, Param, RoxType, Stack};
 use cranelift::prelude::*;
-use cranelift_module::{Backend, DataContext, Linkage, Module};
+use cranelift_module::{Backend, DataContext, Linkage, Module, ModuleError};
 use im::HashMap;
 use std::borrow::Borrow;
 
@@ -72,7 +72,46 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                     self.builder.ins().return_(&[]);
                 }
             }
-            _ => {}
+            TaggedStatement::IfElse(conditional, if_statements, else_statements_maybe) => {
+                let if_block = self.builder.create_block();
+                let else_block = self.builder.create_block();
+                let merge_block = self.builder.create_block();
+
+                let conditional_value = self.translate_expression(conditional)[0];
+
+                self.builder.ins().brz(conditional_value, else_block, &[]);
+                self.builder.ins().jump(if_block, &[]);
+
+                self.read_into_block(Some(if_statements.clone()), if_block, merge_block);
+                self.read_into_block(else_statements_maybe.clone(), else_block, merge_block);
+
+                self.builder.switch_to_block(merge_block);
+                self.builder.seal_block(merge_block);
+            }
+            _ => unimplemented!()
+        }
+    }
+
+    #[allow(clippy::vec_box)]
+    fn read_into_block(
+        &mut self,
+        maybe_statements: Option<Vec<Box<TaggedStatement>>>,
+        conditional_block: Block,
+        merge_block: Block,
+    ) {
+        let mut has_return = false;
+        self.builder.switch_to_block(conditional_block);
+        self.builder.seal_block(conditional_block);
+        if let Some(if_statements) = maybe_statements {
+            if_statements.iter().for_each(|statement| {
+                if let TaggedStatement::Return(_) = statement.as_ref() {
+                    has_return = true;
+                }
+                self.translate_statement(statement.as_ref());
+            });
+        }
+        if !has_return {
+            self.builder.ins().jump(merge_block, &[]);
         }
     }
 
@@ -130,21 +169,25 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             }
             Number(num) => vec![self.builder.ins().f64const(*num)],
             String(string) => {
-                self.data_context
-                    .define(string.clone().into_bytes().into_boxed_slice());
-                let mut string_name = string.clone();
-                string_name.push_str("__RUST_STRING_DO_NOT_TOUCH__");
+                self.define_null_terminated_string(string);
                 let id = self
                     .module
                     .declare_data(
-                        string_name.as_ref(),
+                        string.as_ref(),
                         Linkage::Export,
                         false,
                         false,
                         None,
                     )
                     .unwrap();
-                self.module.define_data(id, &self.data_context).unwrap();
+                match self.module.define_data(id, &self.data_context) {
+                    Ok(_) => Ok(()),
+                    Err(error) => match error {
+                        ModuleError::DuplicateDefinition(_) => Ok(()),
+                        err => Err(err),
+                    },
+                }
+                .expect("Could not define string in module");
                 let value =
                     self.module.declare_data_in_func(id, self.builder.func);
                 self.data_context.clear();
@@ -179,39 +222,23 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 let lval = self.translate_expression(left)[0];
                 let rval = self.translate_expression(right)[0];
                 let result = match operation {
-                    Concat => self.builder.ins().vconcat(lval, rval),
                     Add => self.builder.ins().fadd(lval, rval),
                     Subtract => self.builder.ins().fsub(lval, rval),
                     Multiply => self.builder.ins().fmul(lval, rval),
                     Divide => self.builder.ins().fdiv(lval, rval),
                     Equals => {
-                        let bool =
-                            self.builder.ins().fcmp(FloatCC::Equal, lval, rval);
-                        self.builder.ins().bint(types::B1, bool)
+                        self.builder.ins().fcmp(FloatCC::Equal, lval, rval)
                     }
                     NotEquals => {
-                        let bool = self.builder.ins().fcmp(
-                            FloatCC::NotEqual,
-                            lval,
-                            rval,
-                        );
-                        self.builder.ins().bint(types::B1, bool)
+                        self.builder.ins().fcmp(FloatCC::NotEqual, lval, rval)
                     }
-                    GreaterThan => {
-                        let bool = self.builder.ins().fcmp(
-                            FloatCC::GreaterThan,
-                            lval,
-                            rval,
-                        );
-                        self.builder.ins().bint(types::B1, bool)
-                    }
+                    GreaterThan => self.builder.ins().fcmp(
+                        FloatCC::GreaterThan,
+                        lval,
+                        rval,
+                    ),
                     LessThan => {
-                        let bool = self.builder.ins().fcmp(
-                            FloatCC::LessThan,
-                            lval,
-                            rval,
-                        );
-                        self.builder.ins().bint(types::B1, bool)
+                        self.builder.ins().fcmp(FloatCC::LessThan, lval, rval)
                     }
                 };
                 vec![result]
@@ -248,10 +275,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         match tagged_expression {
             String(_) => get_codegen_type(&RoxType::String),
             Number(_) | Unary(_, _) => get_codegen_type(&RoxType::Number),
-            Operation(_, operation, _) => match operation {
-                syntax::Operation::Concat => get_codegen_type(&RoxType::String),
-                _ => get_codegen_type(&RoxType::Number),
-            },
+            Operation(_, _, _) => get_codegen_type(&RoxType::Number),
             Boolean(_) => get_codegen_type(&RoxType::Bool),
             And(_, _) => get_codegen_type(&RoxType::Bool),
             Assignment(_, expression) => self.get_expression_type(expression),
@@ -268,6 +292,18 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 todo!()
             }
         }
+    }
+
+    /// Note that reading a string into bytes with `string.into_bytes()`
+    /// does _not_ include the null terminator. If we don't add it
+    /// here, multiple strings co-located in the same function
+    /// will read together as one giant string since we
+    /// store the pointer, not the actual string
+    fn define_null_terminated_string(&mut self, original_string: &str) {
+        let mut null_terminated_string = original_string.to_string();
+        null_terminated_string.push('\0');
+        self.data_context
+            .define(null_terminated_string.into_bytes().into_boxed_slice());
     }
 }
 
@@ -289,6 +325,6 @@ fn get_codegen_type(rox_type: &RoxType) -> types::Type {
         RoxType::Void => types::INVALID,
         RoxType::Bool => types::B1,
         RoxType::Number => types::F64,
-        RoxType::String => types::I64X2,
+        RoxType::String => types::I64,
     }
 }
