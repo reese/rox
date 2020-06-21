@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![allow(clippy::needless_doctest_main)]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/reese/rox/master/assets/rox-logo-transparent-bg.png"
 )]
@@ -121,7 +122,7 @@ where
             let bytes = product.emit().unwrap();
             File::create(object_file_output.into())
                 .unwrap()
-                .write(&bytes)
+                .write_all(&bytes)
                 .unwrap();
             Ok(())
         }

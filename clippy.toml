@@ -1,2 +1,0 @@
-# We often define a `main` function _in Rox_, but clippy thinks it's in Rust
-needless_doctest_main = false
