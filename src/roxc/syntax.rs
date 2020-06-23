@@ -1,12 +1,12 @@
 use crate::roxc::{semant, ArenaType};
 
 #[derive(Clone, Debug)]
+#[allow(clippy::vec_box)]
 pub enum Expression {
     And(Box<Expression>, Box<Expression>),
     Array(Vec<Box<Expression>>),
     Assignment(String, Box<Expression>),
     Boolean(bool),
-    #[allow(clippy::vec_box)]
     FunctionCall(String, Vec<Box<Expression>>),
     Identifier(String),
     Number(f64),

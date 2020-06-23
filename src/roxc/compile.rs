@@ -91,10 +91,10 @@ impl<T: Backend> Compiler<T> {
         &mut self,
         declarations: &[Declaration],
     ) -> Result<Vec<()>> {
-        let tagged_declarations = analyse_program(declarations);
+        let tagged_declarations = analyse_program(declarations)?;
         tagged_declarations
             .iter()
-            .map(|declaration| self.translate_declaration(declaration))
+            .map(|declaration| Ok(self.translate_declaration(declaration)?))
             .collect()
     }
 

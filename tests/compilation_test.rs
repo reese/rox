@@ -1,7 +1,8 @@
 extern crate rox;
 
-fn run_functions_compilation() -> rox::Result<()> {
-    rox::execute_source_string(
+#[test]
+fn it_compiles_functions() {
+    let result = rox::execute_source_string(
         r#"
     fn test (x: Number) -> Number {
         if x == 9 {
@@ -17,11 +18,18 @@ fn run_functions_compilation() -> rox::Result<()> {
         let x = "Hello, world!";
         puts(x);
     }"#,
-    )
-}
-
-#[test]
-fn it_compiles_functions() {
-    let result = run_functions_compilation();
+    );
     assert!(result.is_ok());
 }
+
+// #[test]
+// fn it_compiles_arrays() {
+//     let result = rox::execute_source_string(
+//         r#"
+//     fn main() {
+//         let list = [1, 2, 3, 4];
+//     }
+//     "#,
+//     );
+//     assert!(result.is_ok());
+// }

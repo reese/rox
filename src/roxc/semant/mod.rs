@@ -23,7 +23,8 @@ use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
 };
 use crate::roxc::{
-    get_builtin_types, syntax, Declaration, Expression, RoxType, Statement,
+    get_builtin_types, syntax, Declaration, Expression, Result, RoxType,
+    Statement,
 };
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
@@ -39,7 +40,7 @@ pub(crate) type Env = HashMap<String, ArenaType>;
 
 pub(crate) fn analyse_program(
     declarations: &[Declaration],
-) -> Vec<TaggedDeclaration> {
+) -> Result<Vec<TaggedDeclaration>> {
     let (mut types, mut env) = get_builtin_types();
     let non_generics = HashSet::new();
     declarations
@@ -51,11 +52,11 @@ pub(crate) fn analyse_program(
                     *statement.clone(),
                     &mut env,
                     &non_generics,
-                ),
+                )?,
             };
-            TaggedDeclaration::Function(tagged_statement)
+            Ok(TaggedDeclaration::Function(tagged_statement))
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>>>()
 }
 
 fn analyse_statement(
@@ -63,38 +64,43 @@ fn analyse_statement(
     node: Statement,
     env: &mut Env,
     non_generic: &HashSet<ArenaType>,
-) -> TaggedStatement {
+) -> Result<TaggedStatement> {
     use Statement::*;
     match node {
-        Block(block) => TaggedStatement::Block(analyse_block(
+        Block(block) => Ok(TaggedStatement::Block(analyse_block(
             types,
             env,
             non_generic,
             block,
-        )),
+        )?)),
         Expression(expression) => {
             let tagged_expression =
-                analyse_expression(types, *expression, env, non_generic);
-            TaggedStatement::Expression(tagged_expression)
+                analyse_expression(types, *expression, env, non_generic)?;
+            Ok(TaggedStatement::Expression(tagged_expression))
         }
         IfElse(if_expression, if_block, else_block) => {
             let tagged_if =
-                analyse_expression(types, *if_expression, env, non_generic);
+                analyse_expression(types, *if_expression, env, non_generic)?;
             unify(types, BOOL_TYPE_VAL, tagged_if.clone().into());
             let tagged_if_block =
-                analyse_block(types, env, non_generic, if_block);
+                analyse_block(types, env, non_generic, if_block)?;
             let tagged_else_block = else_block
                 .map(|block| analyse_block(types, env, non_generic, block));
+            if let Some(result) = tagged_else_block.clone() {
+                if result.is_err() {
+                    return Err(result.err().unwrap());
+                }
+            }
 
-            TaggedStatement::IfElse(
+            Ok(TaggedStatement::IfElse(
                 Box::from(tagged_if),
                 tagged_if_block,
-                tagged_else_block,
-            )
+                tagged_else_block.map(|r| r.unwrap()),
+            ))
         }
         FunctionDeclaration(name, params, return_type, statements) => {
             let param_types: Vec<(String, usize)> =
-                get_param_types(types, env, &params);
+                get_param_types(types, env, &params)?;
             let result_type =
                 return_type.clone().map(|t| *env.get(&t).unwrap());
             let new_env = env.clone();
@@ -104,9 +110,9 @@ fn analyse_statement(
             }
             let new_non_generic = non_generic.clone();
             let arg_types =
-                get_arg_types(param_types, new_env, new_non_generic);
+                get_arg_types(param_types, new_env, new_non_generic)?;
 
-            let tagged_block = statements
+            let tagged_block: Vec<Box<TaggedStatement>> = statements
                 .iter()
                 .map(|statement| {
                     let tagged_statement = match statement.as_ref() {
@@ -117,27 +123,29 @@ fn analyse_statement(
                                     *expression.clone(),
                                     env,
                                     non_generic,
-                                );
+                                )?;
                                 unify(
                                     types,
                                     expression_type.clone().into(),
                                     result_type.unwrap(),
                                 );
-                                TaggedStatement::Return(Some(expression_type))
+                                Ok(TaggedStatement::Return(Some(
+                                    expression_type,
+                                )))
                             } else {
-                                TaggedStatement::Return(None)
+                                Ok(TaggedStatement::Return(None))
                             }
                         }
-                        _ => analyse_statement(
+                        _ => Ok(analyse_statement(
                             types,
                             *statement.clone(),
                             env,
                             non_generic,
-                        ),
-                    };
-                    Box::new(tagged_statement)
+                        )?),
+                    }?;
+                    Ok(Box::new(tagged_statement))
                 })
-                .collect::<Vec<_>>();
+                .collect::<Result<Vec<_>>>()?;
 
             let return_type_vec =
                 result_type.map_or_else(Vec::new, |t| vec![t]);
@@ -153,12 +161,22 @@ fn analyse_statement(
                 params,
                 return_type,
             };
-            TaggedStatement::FunctionDeclaration(declaration, tagged_block)
+            Ok(TaggedStatement::FunctionDeclaration(
+                declaration,
+                tagged_block,
+            ))
         }
         Return(maybe_expression) => {
             let maybe_tagged_return = maybe_expression
                 .map(|exp| analyse_expression(types, *exp, env, non_generic));
-            TaggedStatement::Return(maybe_tagged_return)
+            if let Some(result) = maybe_tagged_return.clone() {
+                if result.is_err() {
+                    return Err(result.err().unwrap());
+                }
+            }
+            Ok(TaggedStatement::Return(
+                maybe_tagged_return.map(|r| r.unwrap()),
+            ))
         }
     }
 }
@@ -169,41 +187,41 @@ fn analyse_block(
     env: &mut HashMap<String, usize>,
     non_generic: &HashSet<usize>,
     if_block: Vec<Box<Statement>>,
-) -> Vec<Box<TaggedStatement>> {
+) -> Result<Vec<Box<TaggedStatement>>> {
     let mut scoped_env = env.clone();
     if_block
         .iter()
         .map(|statement| {
-            Box::new(analyse_statement(
+            Ok(Box::new(analyse_statement(
                 types,
                 *statement.clone(),
                 &mut scoped_env,
                 non_generic,
-            ))
+            )?))
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>>>()
 }
 
 fn get_arg_types(
     param_types: Vec<(String, usize)>,
     mut new_env: HashMap<String, usize>,
     mut new_non_generic: HashSet<usize>,
-) -> Vec<usize> {
+) -> Result<Vec<usize>> {
     param_types
         .iter()
         .map(|(name, arg_type)| {
             new_env.insert(name.parse().unwrap(), *arg_type);
             new_non_generic.insert(*arg_type);
-            *arg_type
+            Ok(*arg_type)
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>>>()
 }
 
 fn get_param_types(
     types: &mut Vec<Type>,
     env: &mut HashMap<String, usize>,
     params: &[(String, String)],
-) -> Vec<(String, usize)> {
+) -> Result<Vec<(String, usize)>> {
     params
         .iter()
         .map(|(param_name, param_type_name)| {
@@ -214,9 +232,9 @@ fn get_param_types(
                 id: variable,
                 instance: Some(param_arena_type),
             });
-            (param_name.clone(), param_arena_type)
+            Ok((param_name.clone(), param_arena_type))
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>>>()
 }
 
 fn analyse_expression(
@@ -224,80 +242,80 @@ fn analyse_expression(
     node: Expression,
     env: &mut Env,
     non_generic: &HashSet<ArenaType>,
-) -> TaggedExpression {
+) -> Result<TaggedExpression> {
     match node {
         Expression::Assignment(name, expression) => {
             let tagged_expression =
-                analyse_expression(types, *expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic)?;
             let variable_type = env.get(&name).unwrap();
             unify(types, tagged_expression.clone().into(), *variable_type);
-            TaggedExpression::Assignment(name, Box::new(tagged_expression))
+            Ok(TaggedExpression::Assignment(name, Box::new(tagged_expression)))
         }
         Expression::Identifier(ref name) => {
             let arena_type = env
                 .get(name)
                 .unwrap_or_else(|| panic!("Unexpected identifier: {}", name));
-            TaggedExpression::Identifier(
+            Ok(TaggedExpression::Identifier(
                 name.clone(),
                 RoxType::from(*arena_type),
-            )
+            ))
         }
-        Expression::String(string) => TaggedExpression::String(string),
-        Expression::Number(num) => TaggedExpression::Number(num),
-        Expression::Boolean(bool) => TaggedExpression::Boolean(bool),
+        Expression::String(string) => Ok(TaggedExpression::String(string)),
+        Expression::Number(num) => Ok(TaggedExpression::Number(num)),
+        Expression::Boolean(bool) => Ok(TaggedExpression::Boolean(bool)),
         Expression::Variable(name, expression) => {
             let tagged_expression =
-                analyse_expression(types, *expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic)?;
             let variable = tagged_expression.clone().into();
             types.push(Type::Variable {
                 id: variable,
                 instance: Some(variable),
             });
             env.insert(name.clone(), variable);
-            TaggedExpression::Variable(name, Box::new(tagged_expression))
+            Ok(TaggedExpression::Variable(name, Box::new(tagged_expression)))
         }
         Expression::Or(left, right) => {
             let left_expression =
-                analyse_expression(types, *left, env, non_generic);
+                analyse_expression(types, *left, env, non_generic)?;
             let right_expression =
-                analyse_expression(types, *right, env, non_generic);
+                analyse_expression(types, *right, env, non_generic)?;
             unify(types, left_expression.clone().into(), BOOL_TYPE_VAL);
             unify(types, right_expression.clone().into(), BOOL_TYPE_VAL);
-            TaggedExpression::Or(
+            Ok(TaggedExpression::Or(
                 left_expression.into(),
                 right_expression.into(),
-            )
+            ))
         }
         Expression::And(left, right) => {
             let left_expression =
-                analyse_expression(types, *left, env, non_generic);
+                analyse_expression(types, *left, env, non_generic)?;
             let right_expression =
-                analyse_expression(types, *right, env, non_generic);
+                analyse_expression(types, *right, env, non_generic)?;
             unify(types, left_expression.clone().into(), BOOL_TYPE_VAL);
             unify(types, right_expression.clone().into(), BOOL_TYPE_VAL);
-            TaggedExpression::And(
+            Ok(TaggedExpression::And(
                 left_expression.into(),
                 right_expression.into(),
-            )
+            ))
         }
         Expression::Operation(left, operation, right) => {
             let left_expression =
-                analyse_expression(types, *left, env, non_generic);
+                analyse_expression(types, *left, env, non_generic)?;
             let right_expression =
-                analyse_expression(types, *right, env, non_generic);
+                analyse_expression(types, *right, env, non_generic)?;
             unify(types, left_expression.clone().into(), NUMBER_TYPE_VAL);
             unify(types, right_expression.clone().into(), NUMBER_TYPE_VAL);
-            TaggedExpression::Operation(
+            Ok(TaggedExpression::Operation(
                 left_expression.into(),
                 operation,
                 right_expression.into(),
-            )
+            ))
         }
         Expression::Unary(operator, expression) => {
             let tagged_expression =
-                analyse_expression(types, *expression, env, non_generic);
+                analyse_expression(types, *expression, env, non_generic)?;
             unify(types, tagged_expression.clone().into(), NUMBER_TYPE_VAL);
-            TaggedExpression::Unary(operator, tagged_expression.into())
+            Ok(TaggedExpression::Unary(operator, tagged_expression.into()))
         }
         Expression::FunctionCall(name, arg_expressions) => {
             let function_arena_type = *env.get(&name).unwrap();
@@ -305,7 +323,7 @@ fn analyse_expression(
                 types.get(function_arena_type).unwrap().clone();
             if let Type::Function { return_types, .. } = function_type_signature
             {
-                let tagged_arg_expressions: Vec<Box<TaggedExpression>> =
+                let tagged_arg_expressions =
                     arg_expressions
                         .iter()
                         .map(|arg| {
@@ -315,8 +333,10 @@ fn analyse_expression(
                                 env,
                                 non_generic,
                             )
-                            .into()
                         })
+                        .collect::<Result<Vec<_>>>()?
+                        .iter()
+                        .map(|e| Box::new(e.clone()))
                         .collect::<Vec<_>>();
 
                 let arg_arena_types = tagged_arg_expressions
@@ -330,14 +350,14 @@ fn analyse_expression(
                     return_types.as_ref(),
                 );
                 unify(types, func, function_arena_type);
-                TaggedExpression::FunctionCall(
+                Ok(TaggedExpression::FunctionCall(
                     name,
                     tagged_arg_expressions,
                     return_types
                         .get(0)
                         .map(|t| RoxType::from(*t))
                         .unwrap_or(RoxType::Void),
-                )
+                ))
             // TODO: ^^ This will probably need to be refactored to support multiple returns
             // since functions no longer resolve to one value}
             } else {
