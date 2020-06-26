@@ -57,7 +57,11 @@ impl From<ArenaType> for RoxType {
             semant::NUMBER_TYPE_VAL => RoxType::Number,
             semant::BOOL_TYPE_VAL => RoxType::Bool,
             semant::STRING_TYPE_VAL => RoxType::String,
-            _ => panic!("Rox does not yet support user-defined types"),
+            semant::VOID_TYPE_VAL => RoxType::Void,
+            x => {
+                dbg!(x);
+                panic!("Rox does not yet support user-defined types")
+            }
         }
     }
 }

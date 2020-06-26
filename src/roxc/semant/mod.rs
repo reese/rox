@@ -23,11 +23,12 @@ use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
 };
 use crate::roxc::{
-    get_builtin_types, syntax, Declaration, Expression, Result, RoxType,
-    Statement,
+    get_builtin_types, syntax, Declaration, Expression, Result, RoxError,
+    RoxType, Statement,
 };
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 pub use types::ArenaType;
 use types::*;
 
@@ -38,6 +39,9 @@ pub const STRING_TYPE_VAL: ArenaType = 3;
 
 pub(crate) type Env = HashMap<String, ArenaType>;
 
+/// # Type Checking
+/// `analyse_program` is the top level function from which we
+/// type check the entire program.
 pub(crate) fn analyse_program(
     declarations: &[Declaration],
 ) -> Result<Vec<TaggedDeclaration>> {
@@ -151,6 +155,7 @@ fn analyse_statement(
                 result_type.map_or_else(Vec::new, |t| vec![t]);
 
             let new_arena_type = new_function(
+                name.clone(),
                 types,
                 arg_types.as_ref(),
                 return_type_vec.as_slice(),
@@ -219,19 +224,16 @@ fn get_arg_types(
 
 fn get_param_types(
     types: &mut Vec<Type>,
-    env: &mut HashMap<String, usize>,
+    env: &mut HashMap<String, ArenaType>,
     params: &[(String, String)],
 ) -> Result<Vec<(String, usize)>> {
     params
         .iter()
         .map(|(param_name, param_type_name)| {
             let variable = new_variable(types);
-            let param_arena_type = *env.get(param_type_name.as_str()).unwrap();
+            let param_arena_type = get_type(param_type_name, env)?;
+            unify(types, variable, param_arena_type);
             env.insert(param_name.to_string(), param_arena_type);
-            types.push(Type::Variable {
-                id: variable,
-                instance: Some(param_arena_type),
-            });
             Ok((param_name.clone(), param_arena_type))
         })
         .collect::<Result<Vec<_>>>()
@@ -252,12 +254,10 @@ fn analyse_expression(
             Ok(TaggedExpression::Assignment(name, Box::new(tagged_expression)))
         }
         Expression::Identifier(ref name) => {
-            let arena_type = env
-                .get(name)
-                .unwrap_or_else(|| panic!("Unexpected identifier: {}", name));
+            let arena_type = get_type(name, env)?;
             Ok(TaggedExpression::Identifier(
                 name.clone(),
-                RoxType::from(*arena_type),
+                RoxType::from(arena_type),
             ))
         }
         Expression::String(string) => Ok(TaggedExpression::String(string)),
@@ -266,12 +266,9 @@ fn analyse_expression(
         Expression::Variable(name, expression) => {
             let tagged_expression =
                 analyse_expression(types, *expression, env, non_generic)?;
-            let variable = tagged_expression.clone().into();
-            types.push(Type::Variable {
-                id: variable,
-                instance: Some(variable),
-            });
-            env.insert(name.clone(), variable);
+            let variable = new_variable(types);
+            unify(types, variable, tagged_expression.clone().into());
+            env.insert(name.clone(), tagged_expression.clone().into());
             Ok(TaggedExpression::Variable(name, Box::new(tagged_expression)))
         }
         Expression::Or(left, right) => {
@@ -321,7 +318,7 @@ fn analyse_expression(
             let function_arena_type = *env.get(&name).unwrap();
             let function_type_signature =
                 types.get(function_arena_type).unwrap().clone();
-            if let Type::Function { return_types, .. } = function_type_signature
+            if let Type::Function { return_types, name, .. } = function_type_signature
             {
                 let tagged_arg_expressions =
                     arg_expressions
@@ -345,6 +342,7 @@ fn analyse_expression(
                     .collect::<Vec<_>>();
 
                 let func = new_function(
+                    name.clone(),
                     types,
                     arg_arena_types.as_ref(),
                     return_types.as_ref(),
@@ -415,7 +413,27 @@ fn unify(types: &mut Vec<Type>, first_type: ArenaType, second_type: ArenaType) {
                     .set_instance(min(first_pruned, second_pruned));
             }
         }
-        (Type::Function { .. }, Type::Variable { .. }) => {
+        (
+            Type::Operator {
+                name: left_name,
+                types: left_types,
+            },
+            Type::Operator {
+                name: right_name,
+                types: right_types,
+            },
+        ) => {
+            if left_name != right_name || left_types.len() != right_types.len()
+            {
+                panic!("Type mismatch")
+            } else {
+                for (p, q) in left_types.iter().zip(right_types.iter()) {
+                    unify(types, *p, *q);
+                }
+            }
+        }
+        (Type::Function { .. }, Type::Variable { .. })
+        | (Type::Operator { .. }, Type::Variable { .. }) => {
             unify(types, second_pruned, first_pruned)
         }
         (
@@ -440,18 +458,21 @@ fn unify(types: &mut Vec<Type>, first_type: ArenaType, second_type: ArenaType) {
                 unify(types, *p, *q);
             }
         }
+        (Type::Function { .. }, Type::Operator { .. })
+        | (Type::Operator { .. }, Type::Function { .. }) => {
+            panic!("Cannot unify function and operator")
+        }
     }
 }
 
-// This could potentially be useful when we have generic types,
-// so leaving it for now.
-#[allow(dead_code)]
-fn is_generic(
-    types: &mut Vec<Type>,
-    arena_type: ArenaType,
-    non_generics: &[ArenaType],
-) -> bool {
-    !occurs_in(types, arena_type, non_generics)
+fn get_type(name: &str, env: &Env) -> Result<ArenaType> {
+    match env.get(name) {
+        Some(arena_type) => Ok(*arena_type),
+        None => Err(RoxError::new(
+            PathBuf::from("./src/roxc/semant/mod.rs"), // TODO: Actually pass the file in here
+            format!("Undefined symbol: {}", name).as_ref(),
+        )),
+    }
 }
 
 fn occurs_in_type(

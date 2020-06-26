@@ -6,7 +6,7 @@
 
 use crate::roxc::semant::types::ArenaType;
 use crate::roxc::{
-    FunctionDeclaration, Operation, RoxType, Unary, BOOL_TYPE_VAL,
+    syntax, FunctionDeclaration, Operation, RoxType, Unary, BOOL_TYPE_VAL,
     NUMBER_TYPE_VAL, STRING_TYPE_VAL,
 };
 
@@ -37,7 +37,17 @@ impl Into<ArenaType> for TaggedExpression {
             FunctionCall(_, _, rox_type) | Identifier(_, rox_type) => {
                 rox_type.into()
             }
-            Number(_) | Operation(_, _, _) | Unary(_, _) => NUMBER_TYPE_VAL,
+            Number(_) | Unary(_, _) => NUMBER_TYPE_VAL,
+            Operation(_, operation, _) => match operation {
+                syntax::Operation::Equals
+                | syntax::Operation::NotEquals
+                | syntax::Operation::GreaterThan
+                | syntax::Operation::LessThan => BOOL_TYPE_VAL,
+                syntax::Operation::Add
+                | syntax::Operation::Subtract
+                | syntax::Operation::Multiply
+                | syntax::Operation::Divide => NUMBER_TYPE_VAL,
+            },
             String(_) => STRING_TYPE_VAL,
             Variable(_, expression) => (*expression).into(),
             Array(_) => todo!(),

@@ -14,20 +14,19 @@ fn get_libc_types() -> [(String, Vec<ArenaType>, Vec<ArenaType>); 1] {
 }
 
 pub(crate) fn get_builtin_types() -> (Vec<Type>, Env) {
-    let initial_types = vec![
-        VOID_TYPE_VAL,
-        NUMBER_TYPE_VAL,
-        BOOL_TYPE_VAL,
-        STRING_TYPE_VAL,
+    // These Vecs are empty because these operators are
+    // built in and thus don't map to other types
+    let mut types = vec![
+        Type::new_operator(String::from("Void"), vec![]),
+        Type::new_operator(String::from("Number"), vec![]),
+        Type::new_operator(String::from("Bool"), vec![]),
+        Type::new_operator(String::from("String"), vec![]),
     ];
     let mut env = HashMap::new();
     env.insert(String::from("Number"), NUMBER_TYPE_VAL);
     env.insert(String::from("Bool"), BOOL_TYPE_VAL);
     env.insert(String::from("String"), STRING_TYPE_VAL);
-    let mut types = initial_types
-        .iter()
-        .map(|arena_type| Type::new_variable(*arena_type))
-        .collect::<Vec<_>>();
+    env.insert(String::from("Void"), VOID_TYPE_VAL);
     import_libc_bindings(&mut types, &mut env);
     (types, env)
 }
@@ -36,7 +35,8 @@ fn import_libc_bindings(types: &mut Vec<Type>, env: &mut Env) {
     get_libc_types()
         .iter()
         .for_each(|(func_name, arg_types, return_types)| {
-            let func = new_function(types, arg_types, return_types);
+            let func =
+                new_function(func_name.clone(), types, arg_types, return_types);
             env.insert(func_name.clone(), func);
         });
 }

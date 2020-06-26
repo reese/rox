@@ -4,14 +4,14 @@ extern crate rox;
 fn it_compiles_functions() {
     let result = rox::execute_source_string(
         r#"
-    fn test (x: Number) -> Number {
+    fn test(x: Number) -> Number {
         if x == 9 {
             return x + 1;
         }
         return 4 + 5;
     }
 
-    fn main () {
+    fn main() {
         let ten = test(9);
         let nine = test(1234);
         let three = ten - 7;
@@ -22,14 +22,14 @@ fn it_compiles_functions() {
     assert!(result.is_ok());
 }
 
-// #[test]
-// fn it_compiles_arrays() {
-//     let result = rox::execute_source_string(
-//         r#"
-//     fn main() {
-//         let list = [1, 2, 3, 4];
-//     }
-//     "#,
-//     );
-//     assert!(result.is_ok());
-// }
+#[test]
+fn it_compiles_arrays() {
+    let result = rox::execute_source_string(
+        r#"
+    fn main() {
+        let list = [1, 2, 3, 4];
+    }
+    "#,
+    );
+    assert!(result.is_ok());
+}

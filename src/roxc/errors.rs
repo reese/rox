@@ -32,6 +32,19 @@ pub struct RoxError {
 }
 
 impl RoxError {
+    pub fn new<T: Clone + Into<PathBuf>>(file: T, message: &str) -> Self {
+        let contents = read_to_string(file.clone().into()).unwrap();
+        RoxError {
+            file: SimpleFile::new(
+                file.into().to_str().unwrap().to_string(),
+                contents,
+            ),
+            message: Some(message.to_string()),
+            labels: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
     pub fn from_parse_error(
         error: &ParseError<usize, Token<'_>, &'static str>,
         file: PathBuf,
