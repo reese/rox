@@ -2,8 +2,8 @@ use std::str;
 
 use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
-    analyse_program, get_type_from_name, Declaration, FunctionDeclaration,
-    FunctionTranslator, Result, RoxError, Stack,
+    analyse_program, Declaration, FunctionDeclaration, FunctionTranslator,
+    Identifier, Result, RoxError, Stack,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
@@ -25,8 +25,8 @@ pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
     data_context: DataContext,
     pub(crate) module: Module<T>,
-    environment_stack: Stack<HashMap<String, Variable>>,
-    function_stack: Stack<HashMap<String, FunctionDeclaration>>,
+    environment_stack: Stack<HashMap<Identifier, Variable>>,
+    function_stack: Stack<HashMap<Identifier, FunctionDeclaration>>,
 }
 
 impl<T: Backend> Compiler<T> {
@@ -37,10 +37,10 @@ impl<T: Backend> Compiler<T> {
         function_stack.push(HashMap::new());
         // TODO: Move this into where we add libc types earlier
         function_stack.top_mut().insert(
-            "puts".to_string(),
+            Identifier::new_non_generic("puts".to_string()),
             FunctionDeclaration {
-                name: "puts".to_string(),
-                params: vec![("arg".to_string(), "String".to_string())],
+                name: Identifier::new_non_generic("puts".to_string()),
+                params: vec![("arg".into(), "String".into())],
                 return_type: None,
             },
         );
@@ -117,17 +117,22 @@ impl<T: Backend> Compiler<T> {
                         } = func_declaration;
                         let mut signature = Signature::new(CallConv::SystemV);
                         params.iter().for_each(|(_, type_str)| {
-                            let codegen_type = get_type_from_name(type_str);
+                            let codegen_type = type_str.get_type(
+                                self.module.target_config().pointer_type(),
+                            );
                             signature.params.push(AbiParam::new(codegen_type));
                         });
 
                         if let Some(return_) = return_type {
                             signature.returns.push(AbiParam::new(
-                                get_type_from_name(return_.as_ref()),
+                                return_.get_type(
+                                    self.module.target_config().pointer_type(),
+                                ),
                             ));
                         }
 
-                        codegen_context.func.name = func_name.parse().unwrap();
+                        codegen_context.func.name =
+                            String::from(func_name.clone()).parse().unwrap();
                         codegen_context.func.signature = signature;
 
                         let mut builder = FunctionBuilder::new(
@@ -157,7 +162,7 @@ impl<T: Backend> Compiler<T> {
                         let func = self
                             .module
                             .declare_function(
-                                &func_name,
+                                String::from(func_name.clone()).as_str(),
                                 Linkage::Export,
                                 &codegen_context.func.signature,
                             )

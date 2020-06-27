@@ -1,4 +1,4 @@
-use crate::roxc::{Block, Declaration, Expression, Operation, Param, Statement, Unary};
+use crate::roxc::{Block, Declaration, Expression, Identifier, Operation, Param, Statement, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
@@ -40,8 +40,8 @@ Expression: Box<Expression> = {
 Assignment: Box<Expression> = {
     // TODO: Allow for assignment to function results
     // i.e. `some_call().attribute = 3;`
-    <Identifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
-    "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
+    <NonGenericIdentifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
+    "let" <NonGenericIdentifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
     LogicOr
 }
 
@@ -84,7 +84,7 @@ Unary: Box<Expression> = {
 };
 
 Call: Box<Expression> = {
-    <i: Identifier> "(" <args: (Arguments)?> ")" => Box::new(Expression::FunctionCall(i, args.unwrap_or(Vec::new()))),
+    <i: NonGenericIdentifier> "(" <args: (Arguments)?> ")" => Box::new(Expression::FunctionCall(i, args.unwrap_or(Vec::new()))),
     Primary
 }
 
@@ -108,10 +108,10 @@ Params: Vec<Param> = {
 }
 
 Param: Param = {
-    <i:Identifier> ":" <t:Identifier> => (i, t)
+    <i:NonGenericIdentifier> ":" <t:Identifier> => (i, t)
 }
 
-ReturnType: String = {
+ReturnType: Identifier = {
     "->" <Identifier>
 }
 
@@ -137,7 +137,7 @@ Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
     Num => Box::new(Expression::Number(<>)),
     String => Box::new(Expression::String(<>)),
-    Identifier => Box::new(Expression::Identifier(<>)),
+    NonGenericIdentifier => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
     "[" <Comma<Expression>> "]" => Box::new(Expression::Array(<>)),
     ! => {
@@ -151,8 +151,14 @@ Boolean: bool = {
     "false" => false,
 }
 
-Identifier: String = {
-    r"[a-zA-Z_]([a-zA-Z0-9_?!-])*" => String::from(<>)
+Identifier: Identifier = { GenericIdentifier, NonGenericIdentifier }
+
+GenericIdentifier: Identifier = {
+    <i: NonGenericIdentifier> "<" <generics: Comma<Identifier>> ">" => Identifier::new(i.get_name(), generics),
+}
+
+NonGenericIdentifier: Identifier = {
+    r"[a-zA-Z_]([a-zA-Z0-9_?!-])*" => Identifier::new(String::from(<>), Vec::new())
 }
 
 Num: f64 = {
@@ -163,8 +169,8 @@ String: String = {
     r#""[^"]*""# => <>.chars().skip(1).take(<>.len()-2).collect::<String>()
 }
 
-Comma<T>: Vec<T> = { // (1)
-    <v:(<T> ",")*> <e:T?> => match e { // (2)
+Comma<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T?> => match e {
         None => v,
         Some(e) => {
             let mut v = v;

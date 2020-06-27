@@ -23,8 +23,8 @@ use crate::roxc::semant::tagged_syntax::{
     TaggedDeclaration, TaggedExpression, TaggedStatement,
 };
 use crate::roxc::{
-    get_builtin_types, syntax, Declaration, Expression, Result, RoxError,
-    RoxType, Statement,
+    get_builtin_types, syntax, Declaration, Expression, Identifier, Param,
+    Result, RoxError, RoxType, Statement,
 };
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
@@ -36,8 +36,9 @@ pub const VOID_TYPE_VAL: ArenaType = 0;
 pub const NUMBER_TYPE_VAL: ArenaType = 1;
 pub const BOOL_TYPE_VAL: ArenaType = 2;
 pub const STRING_TYPE_VAL: ArenaType = 3;
+pub const ARRAY_TYPE_VAL: ArenaType = 4;
 
-pub(crate) type Env = HashMap<String, ArenaType>;
+pub(crate) type Env = HashMap<Identifier, ArenaType>;
 
 /// # Type Checking
 /// `analyse_program` is the top level function from which we
@@ -103,13 +104,12 @@ fn analyse_statement(
             ))
         }
         FunctionDeclaration(name, params, return_type, statements) => {
-            let param_types: Vec<(String, usize)> =
-                get_param_types(types, env, &params)?;
+            let param_types = get_param_types(types, env, &params)?;
             let result_type =
                 return_type.clone().map(|t| *env.get(&t).unwrap());
             let new_env = env.clone();
             if let Some(return_) = return_type.clone() {
-                let type_ = new_env.get(return_.as_str()).unwrap();
+                let type_ = new_env.get(&return_).unwrap();
                 unify(types, result_type.unwrap(), *type_);
             }
             let new_non_generic = non_generic.clone();
@@ -189,7 +189,7 @@ fn analyse_statement(
 #[allow(clippy::vec_box)]
 fn analyse_block(
     types: &mut Vec<Type>,
-    env: &mut HashMap<String, usize>,
+    env: &mut Env,
     non_generic: &HashSet<usize>,
     if_block: Vec<Box<Statement>>,
 ) -> Result<Vec<Box<TaggedStatement>>> {
@@ -208,14 +208,14 @@ fn analyse_block(
 }
 
 fn get_arg_types(
-    param_types: Vec<(String, usize)>,
-    mut new_env: HashMap<String, usize>,
-    mut new_non_generic: HashSet<usize>,
+    param_types: Vec<(Identifier, ArenaType)>,
+    mut new_env: Env,
+    mut new_non_generic: HashSet<ArenaType>,
 ) -> Result<Vec<usize>> {
     param_types
         .iter()
         .map(|(name, arg_type)| {
-            new_env.insert(name.parse().unwrap(), *arg_type);
+            new_env.insert(name.clone(), *arg_type);
             new_non_generic.insert(*arg_type);
             Ok(*arg_type)
         })
@@ -224,16 +224,16 @@ fn get_arg_types(
 
 fn get_param_types(
     types: &mut Vec<Type>,
-    env: &mut HashMap<String, ArenaType>,
-    params: &[(String, String)],
-) -> Result<Vec<(String, usize)>> {
+    env: &mut Env,
+    params: &[Param],
+) -> Result<Vec<(Identifier, usize)>> {
     params
         .iter()
         .map(|(param_name, param_type_name)| {
             let variable = new_variable(types);
             let param_arena_type = get_type(param_type_name, env)?;
             unify(types, variable, param_arena_type);
-            env.insert(param_name.to_string(), param_arena_type);
+            env.insert(param_name.clone(), param_arena_type);
             Ok((param_name.clone(), param_arena_type))
         })
         .collect::<Result<Vec<_>>>()
@@ -465,12 +465,12 @@ fn unify(types: &mut Vec<Type>, first_type: ArenaType, second_type: ArenaType) {
     }
 }
 
-fn get_type(name: &str, env: &Env) -> Result<ArenaType> {
+fn get_type(name: &Identifier, env: &Env) -> Result<ArenaType> {
     match env.get(name) {
         Some(arena_type) => Ok(*arena_type),
         None => Err(RoxError::new(
             PathBuf::from("./src/roxc/semant/mod.rs"), // TODO: Actually pass the file in here
-            format!("Undefined symbol: {}", name).as_ref(),
+            format!("Undefined symbol: {:?}", name).as_ref(),
         )),
     }
 }

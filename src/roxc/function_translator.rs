@@ -1,6 +1,8 @@
 use crate::roxc::semant::tagged_syntax::TaggedExpression;
 use crate::roxc::tagged_syntax::TaggedStatement;
-use crate::roxc::{syntax, FunctionDeclaration, Param, RoxType, Stack};
+use crate::roxc::{
+    syntax, FunctionDeclaration, Identifier, Param, RoxType, Stack,
+};
 use cranelift::prelude::*;
 use cranelift_module::{Backend, DataContext, Linkage, Module, ModuleError};
 use im::HashMap;
@@ -9,8 +11,8 @@ use std::borrow::Borrow;
 pub struct FunctionTranslator<'func, T: Backend> {
     builder: &'func mut FunctionBuilder<'func>,
     data_context: &'func mut DataContext,
-    pub variables: &'func mut Stack<HashMap<String, Variable>>,
-    pub functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
+    pub variables: &'func mut Stack<HashMap<Identifier, Variable>>,
+    pub functions: &'func mut Stack<HashMap<Identifier, FunctionDeclaration>>,
     pub module: &'func mut Module<T>,
 }
 
@@ -18,8 +20,8 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     pub fn new(
         builder: &'func mut FunctionBuilder<'func>,
         data_context: &'func mut DataContext,
-        variables: &'func mut Stack<HashMap<String, Variable>>,
-        functions: &'func mut Stack<HashMap<String, FunctionDeclaration>>,
+        variables: &'func mut Stack<HashMap<Identifier, Variable>>,
+        functions: &'func mut Stack<HashMap<Identifier, FunctionDeclaration>>,
         module: &'func mut Module<T>,
     ) -> Self {
         FunctionTranslator {
@@ -119,11 +121,11 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         &mut self,
         expression: &TaggedExpression,
     ) -> Vec<Value> {
-        use TaggedExpression::*;
-
         match expression {
-            Boolean(bool) => vec![self.builder.ins().bconst(types::B1, *bool)],
-            FunctionCall(function_name, args, _rox_type) => {
+            TaggedExpression::Boolean(bool) => {
+                vec![self.builder.ins().bconst(types::B1, *bool)]
+            }
+            TaggedExpression::FunctionCall(function_name, args, _rox_type) => {
                 let FunctionDeclaration {
                     return_type,
                     params,
@@ -132,20 +134,20 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
                 let mut signature = self.module.make_signature();
                 params.iter().for_each(|(_, type_name)| {
-                    signature
-                        .params
-                        .push(AbiParam::new(get_type_from_name(type_name)));
+                    signature.params.push(AbiParam::new(
+                        type_name.get_type(self.pointer_type()),
+                    ));
                 });
                 if let Some(return_) = return_type {
-                    signature
-                        .returns
-                        .push(AbiParam::new(get_type_from_name(return_)));
+                    signature.returns.push(AbiParam::new(
+                        return_.get_type(self.pointer_type()),
+                    ));
                 }
 
                 let callee = self
                     .module
                     .declare_function(
-                        &function_name,
+                        String::from(function_name.clone()).as_str(),
                         Linkage::Import,
                         &signature,
                     )
@@ -167,8 +169,11 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                     returns.to_vec()
                 }
             }
-            Number(num) => vec![self.builder.ins().f64const(*num)],
-            String(string) => {
+
+            TaggedExpression::Number(num) => {
+                vec![self.builder.ins().f64const(*num)]
+            }
+            TaggedExpression::String(string) => {
                 self.define_null_terminated_string(string);
                 let id = self
                     .module
@@ -198,7 +203,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                     value,
                 )]
             }
-            Variable(name, expression) => {
+            TaggedExpression::Variable(name, expression) => {
                 let value = self.translate_expression(expression)[0];
                 let variable_env = self.variables.top_mut();
                 let variable =
@@ -211,13 +216,13 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 self.builder.def_var(variable, value);
                 vec![value]
             }
-            Identifier(name, _rox_type) => {
+            TaggedExpression::Identifier(name, _rox_type) => {
                 let variables = self.variables.top();
                 let variable =
                     variables.get(name).expect("Variable not defined");
                 vec![self.builder.use_var(*variable)]
             }
-            Operation(left, operation, right) => {
+            TaggedExpression::Operation(left, operation, right) => {
                 use syntax::Operation::*;
                 let lval = self.translate_expression(left)[0];
                 let rval = self.translate_expression(right)[0];
@@ -262,7 +267,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             let variable = Variable::new(index);
             self.variables.top_mut().insert(name, variable);
             self.builder
-                .declare_var(variable, get_type_from_name(&type_));
+                .declare_var(variable, type_.get_type(self.pointer_type()));
             self.builder.def_var(variable, *param);
         });
     }
@@ -273,11 +278,16 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     ) -> Type {
         use TaggedExpression::*;
         match tagged_expression {
-            String(_) => get_codegen_type(&RoxType::String),
-            Number(_) | Unary(_, _) => get_codegen_type(&RoxType::Number),
-            Operation(_, _, _) => get_codegen_type(&RoxType::Number),
-            Boolean(_) => get_codegen_type(&RoxType::Bool),
-            And(_, _) => get_codegen_type(&RoxType::Bool),
+            String(_) => RoxType::String.get_codegen_type(self.pointer_type()),
+            Number(_) | Unary(_, _) => {
+                RoxType::Number.get_codegen_type(self.pointer_type())
+            }
+            Operation(_, _, _) => {
+                RoxType::Number.get_codegen_type(self.pointer_type())
+            }
+            Boolean(_) | And(_, _) => {
+                RoxType::Bool.get_codegen_type(self.pointer_type())
+            }
             Assignment(_, expression) => self.get_expression_type(expression),
             FunctionCall(name, _, _rox_type) => {
                 let declaration = self.functions.top().get(name).unwrap();
@@ -285,7 +295,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 return_type
                     .as_ref()
                     // `INVALID` is just `VOID`
-                    .map_or(types::INVALID, |t| get_type_from_name(t.as_ref()))
+                    .map_or(types::INVALID, |t| t.get_type(self.pointer_type()))
             }
             x => {
                 dbg!(x);
@@ -305,26 +315,8 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         self.data_context
             .define(null_terminated_string.into_bytes().into_boxed_slice());
     }
-}
 
-pub(crate) fn get_type_from_name(type_str: &str) -> Type {
-    let rox_type = match type_str {
-        "Bool" => RoxType::Bool,
-        "Number" => RoxType::Number,
-        "String" => RoxType::String,
-        x => {
-            dbg!(x);
-            unimplemented!()
-        }
-    };
-    get_codegen_type(&rox_type)
-}
-
-fn get_codegen_type(rox_type: &RoxType) -> types::Type {
-    match rox_type {
-        RoxType::Void => types::INVALID,
-        RoxType::Bool => types::B1,
-        RoxType::Number => types::F64,
-        RoxType::String => types::I64,
+    fn pointer_type(&self) -> Type {
+        self.module.target_config().pointer_type()
     }
 }

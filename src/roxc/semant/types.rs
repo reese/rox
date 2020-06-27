@@ -1,3 +1,5 @@
+use crate::roxc::Identifier;
+
 pub type ArenaType = usize;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -7,13 +9,16 @@ pub enum Type {
     /// a map from some types to other types
     Function {
         id: ArenaType,
-        name: String,
+        name: Identifier,
         arg_types: Vec<ArenaType>,
         return_types: Vec<ArenaType>,
     },
     /// This `Operator` struct represents an `n`-ary
     /// constructor to create a new type from `n` existing types
-    Operator { name: String, types: Vec<ArenaType> },
+    Operator {
+        name: Identifier,
+        types: Vec<ArenaType>,
+    },
     Variable {
         id: ArenaType,
         instance: Option<ArenaType>,
@@ -21,7 +26,10 @@ pub enum Type {
 }
 
 impl Type {
-    pub(crate) fn new_operator(name: String, types: Vec<ArenaType>) -> Type {
+    pub(crate) fn new_operator(
+        name: Identifier,
+        types: Vec<ArenaType>,
+    ) -> Type {
         Type::Operator { name, types }
     }
     pub(crate) fn new_variable(id: ArenaType) -> Type {
@@ -30,13 +38,13 @@ impl Type {
 
     pub(crate) fn new_function(
         id: ArenaType,
-        name: String,
+        name: Identifier,
         arg_types: &[ArenaType],
         return_types: &[ArenaType],
     ) -> Type {
         Type::Function {
             id,
-            name: name.to_string(),
+            name,
             arg_types: arg_types.to_vec(),
             return_types: return_types.to_vec(),
         }
@@ -54,7 +62,7 @@ impl Type {
 }
 
 pub fn new_function(
-    name: String,
+    name: Identifier,
     types: &mut Vec<Type>,
     from_type: &[ArenaType],
     to_type: &[ArenaType],
@@ -72,7 +80,7 @@ pub fn new_variable(types: &mut Vec<Type>) -> ArenaType {
 
 pub fn new_operator(
     types: &mut Vec<Type>,
-    name: String,
+    name: Identifier,
     operator_types: Vec<ArenaType>,
 ) -> ArenaType {
     let type_ = Type::new_operator(name, operator_types);
