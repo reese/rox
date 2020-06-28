@@ -1,5 +1,3 @@
-use std::str;
-
 use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
     analyse_program, Declaration, FunctionDeclaration, FunctionTranslator,
@@ -54,8 +52,7 @@ impl<T: Backend> Compiler<T> {
         &mut self,
         file: impl Into<PathBuf> + std::clone::Clone,
     ) -> Result<Vec<()>> {
-        let source = read_to_string(file.into()).unwrap();
-        let declarations_result = self.parse_source_code(source.as_ref());
+        let declarations_result = self.parse_source_code(file.into());
         match declarations_result {
             Ok(declarations) => self.compile_declarations(&declarations),
             Err(rox_error) => Err(rox_error),
@@ -66,13 +63,14 @@ impl<T: Backend> Compiler<T> {
         self.module.finish()
     }
 
-    fn parse_source_code<'a>(
-        &'a self,
-        source: &'a str,
+    fn parse_source_code(
+        &self,
+        file: impl Into<PathBuf> + std::clone::Clone,
     ) -> Result<Vec<Declaration>> {
+        let source = read_to_string(file.clone().into()).unwrap();
         let mut errors = Vec::new();
         let declarations = rox_parser::ProgramParser::new()
-            .parse(&mut errors, source)
+            .parse(&mut errors, &source)
             .map_err(|e| {
                 RoxError::from_parse_error(
                     &e,
@@ -81,7 +79,9 @@ impl<T: Backend> Compiler<T> {
             })?;
         match errors {
             empty_vec if empty_vec.is_empty() => Ok(declarations),
-            _ => todo!("We haven't implemented nicer errors for ErrorRecovery types yet.")
+            error_vec => {
+                Err(RoxError::from_error_recoveries(error_vec, file).unwrap())
+            }
         }
     }
 

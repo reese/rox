@@ -39,7 +39,11 @@ use std::process::{Command, Output};
 /// it would likely be a good idea to refactor these
 /// to have POSIX compliant error codes, or at least
 /// some consistent error code system.
-pub fn build_file(path: PathBuf, output: PathBuf, no_link: bool) -> Result<()> {
+pub fn build_file(
+    path: PathBuf,
+    output: PathBuf,
+    no_link: bool,
+) -> Result<isize> {
     build_source_string(output, no_link, path)
 }
 
@@ -48,17 +52,18 @@ pub fn build_source_string(
     output: PathBuf,
     no_link: bool,
     source: PathBuf,
-) -> Result<()> {
+) -> Result<isize> {
     if no_link {
-        compile_file(source, output)
+        compile_file(source, output)?;
+        Ok(0)
     } else {
-        compile_and_link(source, output).unwrap();
-        Ok(())
+        compile_and_link(source, output)?;
+        Ok(0)
     }
 }
 
 /// Run the given file with the SimpleJITBackend
-pub fn run_file(path: PathBuf) -> Result<()> {
+pub fn run_file(path: PathBuf) -> Result<isize> {
     let mut compiler = Compiler::new(init_simplejit_module());
     let compile_result = compiler.compile(&path);
     if compile_result.is_err() {
@@ -67,19 +72,15 @@ pub fn run_file(path: PathBuf) -> Result<()> {
     let Compiler { mut module, .. } = compiler;
     let func_id = module.get_name("main").unwrap();
     // TODO: Handle `argc` and `argv` in `main`
-    // TODO: Actually return the result of this.
     // TODO: Could this unsafe block be pushed into `SimpleJITBackend`?
     match func_id {
-        FuncOrDataId::Func(func) => {
-            unsafe {
-                mem::transmute::<_, fn() -> isize>(
-                    module.get_finalized_function(func),
-                )()
-            };
-        }
+        FuncOrDataId::Func(func) => Ok(unsafe {
+            mem::transmute::<_, fn() -> isize>(
+                module.get_finalized_function(func),
+            )()
+        }),
         _ => unreachable!(),
     }
-    Ok(())
 }
 
 /// Executes the raw source string with the JIT compiler.
@@ -92,7 +93,7 @@ pub fn run_file(path: PathBuf) -> Result<()> {
 /// "#;
 /// execute_source_string(source);
 /// ```
-pub fn execute_source_string(source: &str) -> Result<()> {
+pub fn execute_source_string(source: &str) -> Result<isize> {
     let mut mock_file = temp_dir();
     mock_file.push("temp.rox");
     let mut file = File::create(&mock_file).unwrap();

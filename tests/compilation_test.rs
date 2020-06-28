@@ -26,8 +26,19 @@ fn it_compiles_functions() {
 fn it_compiles_arrays() {
     let result = rox::execute_source_string(
         r#"
+    fn test(x: Number) -> Array<Number> {
+        let arr = array<Number>[2];
+        arr[0] = x;
+        arr[1] = x * 2;
+        return arr;
+    }
+
     fn main() {
-        let list = array<Number>[4];
+        let ten = test(9);
+        let nine = test(1234);
+        let x = "Hello, world!";
+        puts(4);
+        puts(x);
     }
     "#,
     );

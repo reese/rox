@@ -3,7 +3,7 @@ use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::Config;
 use lalrpop_util::lexer::Token;
-use lalrpop_util::ParseError;
+use lalrpop_util::{ErrorRecovery, ParseError};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
@@ -43,6 +43,39 @@ impl RoxError {
             labels: Vec::new(),
             notes: Vec::new(),
         }
+    }
+
+    pub fn from_error_recoveries<T: Clone + Into<PathBuf>>(
+        error_vec: std::vec::Vec<
+            lalrpop_util::ErrorRecovery<
+                usize,
+                lalrpop_util::lexer::Token<'_>,
+                &'static str,
+            >,
+        >,
+        file: T,
+    ) -> Result<Self> {
+        let rox_errors: Vec<RoxError> = error_vec
+            .iter()
+            .map(|ErrorRecovery { error, .. }| {
+                RoxError::from_parse_error(&error.clone(), file.clone().into())
+            })
+            .collect();
+        let labels = rox_errors
+            .iter()
+            .flat_map(|RoxError { labels, .. }| labels.clone())
+            .collect::<Vec<_>>();
+        Ok(RoxError {
+            file: SimpleFile::new(
+                file.clone().into().to_str().unwrap().to_string(),
+                read_to_string(file.into()).unwrap(),
+            ),
+            message: Some(String::from(
+                "Encountered the following errors while parsing",
+            )),
+            notes: vec![],
+            labels,
+        })
     }
 
     pub fn from_parse_error(
