@@ -13,7 +13,7 @@ TopLevelFunctionDeclaration: Declaration = {
 }
 
 Function: Box<Statement> = {
-    "fn" <Identifier> "(" <Params> ")" <(ReturnType)?> <Block> => Box::new(Statement::FunctionDeclaration(<>))
+    "fn" <NonGenericIdentifier> <("<" <Comma<NonGenericIdentifier>> ">")?> "(" <Params> ")" <(ReturnType)?> <Block> => Box::new(Statement::FunctionDeclaration(<>))
 }
 
 Block: Block = {
@@ -40,7 +40,7 @@ Expression: Box<Expression> = {
 Assignment: Box<Expression> = {
     // TODO: Allow for assignment to function results
     // i.e. `some_call().attribute = 3;`
-    <NonGenericIdentifier> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
+    <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
     "let" <NonGenericIdentifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
     LogicOr
 }
@@ -139,7 +139,7 @@ Primary: Box<Expression> = {
     String => Box::new(Expression::String(<>)),
     NonGenericIdentifier => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
-    "[" <Comma<Expression>> "]" => Box::new(Expression::Array(<>)),
+    "array" "<" <Identifier> ">" "[" <Num> "]" => Box::new(Expression::Array(<>)),
     ! => {
         errors.push(<>);
         Box::new(Expression::ParseError)

@@ -173,6 +173,35 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             TaggedExpression::Number(num) => {
                 vec![self.builder.ins().f64const(*num)]
             }
+            TaggedExpression::Array(
+                interior_type_identifier,
+                length,
+                _rox_type,
+            ) => {
+                self.data_context.define_zeroinit(
+                    (self.pointer_type().bytes() * (*length as u32)) as usize,
+                );
+                let data_id = self
+                    .module
+                    .declare_data(
+                        interior_type_identifier.get_name().as_ref(),
+                        Linkage::Export,
+                        true,
+                        false,
+                        None,
+                    )
+                    .unwrap();
+                self.module
+                    .define_data(data_id, &self.data_context)
+                    .unwrap();
+                let value = self
+                    .module
+                    .declare_data_in_func(data_id, self.builder.func);
+                self.data_context.clear();
+                self.module.finalize_definitions();
+                let pointer_type = self.pointer_type();
+                vec![self.builder.ins().global_value(pointer_type, value)]
+            }
             TaggedExpression::String(string) => {
                 self.define_null_terminated_string(string);
                 let id = self
@@ -197,11 +226,9 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                     self.module.declare_data_in_func(id, self.builder.func);
                 self.data_context.clear();
                 self.module.finalize_definitions();
+                let pointer_type = self.pointer_type();
 
-                vec![self.builder.ins().global_value(
-                    self.module.target_config().pointer_type(),
-                    value,
-                )]
+                vec![self.builder.ins().global_value(pointer_type, value)]
             }
             TaggedExpression::Variable(name, expression) => {
                 let value = self.translate_expression(expression)[0];
@@ -278,6 +305,9 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     ) -> Type {
         use TaggedExpression::*;
         match tagged_expression {
+            Array(_, _, _) => {
+                RoxType::Array.get_codegen_type(self.pointer_type())
+            }
             String(_) => RoxType::String.get_codegen_type(self.pointer_type()),
             Number(_) | Unary(_, _) => {
                 RoxType::Number.get_codegen_type(self.pointer_type())

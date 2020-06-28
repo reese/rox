@@ -7,15 +7,15 @@
 use crate::roxc::semant::types::ArenaType;
 use crate::roxc::{
     syntax, FunctionDeclaration, Identifier, Operation, RoxType, Unary,
-    BOOL_TYPE_VAL, NUMBER_TYPE_VAL, STRING_TYPE_VAL,
+    ARRAY_TYPE_VAL, BOOL_TYPE_VAL, NUMBER_TYPE_VAL, STRING_TYPE_VAL,
 };
 
 #[derive(Clone, Debug)]
 #[allow(clippy::vec_box)]
 pub enum TaggedExpression {
     And(Box<TaggedExpression>, Box<TaggedExpression>),
-    Array(Vec<Box<TaggedExpression>>),
-    Assignment(Identifier, Box<TaggedExpression>),
+    Array(Identifier, f64, RoxType),
+    Assignment(Box<TaggedExpression>, Box<TaggedExpression>),
     Boolean(bool),
     #[allow(clippy::vec_box)]
     FunctionCall(Identifier, Vec<Box<TaggedExpression>>, RoxType),
@@ -50,7 +50,7 @@ impl Into<ArenaType> for TaggedExpression {
             },
             String(_) => STRING_TYPE_VAL,
             Variable(_, expression) => (*expression).into(),
-            Array(_) => todo!(),
+            Array(_, _, _) => ARRAY_TYPE_VAL,
         }
     }
 }

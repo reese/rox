@@ -10,16 +10,11 @@ use cranelift::prelude::*;
 use cranelift_codegen::isa::CallConv;
 use cranelift_module::{Backend, DataContext, Linkage, Module};
 use im::HashMap;
-use lalrpop_util::lexer::Token;
-use lalrpop_util::ErrorRecovery;
 use std::borrow::Borrow;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
 lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
-
-type LalrpopParseError<'input> =
-    ErrorRecovery<usize, Token<'input>, &'static str>;
 
 pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
@@ -40,6 +35,7 @@ impl<T: Backend> Compiler<T> {
             Identifier::new_non_generic("puts".to_string()),
             FunctionDeclaration {
                 name: Identifier::new_non_generic("puts".to_string()),
+                generics: Vec::new(),
                 params: vec![("arg".into(), "String".into())],
                 return_type: None,
             },
@@ -58,14 +54,11 @@ impl<T: Backend> Compiler<T> {
         &mut self,
         file: impl Into<PathBuf> + std::clone::Clone,
     ) -> Result<Vec<()>> {
-        let source = read_to_string(file.clone().into()).unwrap();
+        let source = read_to_string(file.into()).unwrap();
         let declarations_result = self.parse_source_code(source.as_ref());
         match declarations_result {
             Ok(declarations) => self.compile_declarations(&declarations),
-            Err(parse_errors) => Err(RoxError::from_parse_error(
-                &parse_errors.first().unwrap().error,
-                file.into(),
-            )),
+            Err(rox_error) => Err(rox_error),
         }
     }
 
@@ -76,14 +69,19 @@ impl<T: Backend> Compiler<T> {
     fn parse_source_code<'a>(
         &'a self,
         source: &'a str,
-    ) -> std::result::Result<Vec<Declaration>, Vec<LalrpopParseError>> {
+    ) -> Result<Vec<Declaration>> {
         let mut errors = Vec::new();
         let declarations = rox_parser::ProgramParser::new()
             .parse(&mut errors, source)
-            .unwrap();
+            .map_err(|e| {
+                RoxError::from_parse_error(
+                    &e,
+                    PathBuf::from("./scratch/test.rox"),
+                )
+            })?;
         match errors {
             empty_vec if empty_vec.is_empty() => Ok(declarations),
-            error_vec => Err(error_vec),
+            _ => todo!("We haven't implemented nicer errors for ErrorRecovery types yet.")
         }
     }
 
@@ -112,6 +110,7 @@ impl<T: Backend> Compiler<T> {
                     ) => {
                         let FunctionDeclaration {
                             name: func_name,
+                            generics,
                             params,
                             return_type,
                         } = func_declaration;
@@ -142,6 +141,7 @@ impl<T: Backend> Compiler<T> {
 
                         let function_declaration = FunctionDeclaration {
                             name: func_name.clone(),
+                            generics: generics.clone(),
                             params: params.clone(),
                             return_type: return_type.clone(),
                         };

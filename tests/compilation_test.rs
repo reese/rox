@@ -27,7 +27,7 @@ fn it_compiles_arrays() {
     let result = rox::execute_source_string(
         r#"
     fn main() {
-        let list = [1, 2, 3, 4];
+        let list = array<Number>[4];
     }
     "#,
     );

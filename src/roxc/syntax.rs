@@ -1,13 +1,13 @@
 use crate::roxc::{semant, ArenaType};
 use cranelift::prelude::{types, Type};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 #[derive(Clone, Debug)]
 #[allow(clippy::vec_box)]
 pub enum Expression {
     And(Box<Expression>, Box<Expression>),
-    Array(Vec<Box<Expression>>),
-    Assignment(Identifier, Box<Expression>),
+    Array(Identifier, f64),
+    Assignment(Box<Expression>, Box<Expression>),
     Boolean(bool),
     FunctionCall(Identifier, Vec<Box<Expression>>),
     Identifier(Identifier),
@@ -23,7 +23,7 @@ pub enum Expression {
 pub type Block = Vec<Box<Statement>>;
 pub type Param = (Identifier, Identifier);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Identifier {
     name: String,
     generic_fields: Vec<Identifier>,
@@ -55,6 +55,7 @@ impl Identifier {
             "Bool" => RoxType::Bool,
             "Number" => RoxType::Number,
             "String" => RoxType::String,
+            "Array" => RoxType::Array,
             x => {
                 dbg!(x);
                 unimplemented!()
@@ -74,22 +75,6 @@ impl From<Identifier> for String {
         final_string
     }
 }
-
-impl Hash for Identifier {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.generic_fields.hash(state);
-    }
-}
-
-impl PartialEq for Identifier {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_name() == other.get_name()
-            && self.get_generic_fields() == other.get_generic_fields()
-    }
-}
-
-impl Eq for Identifier {}
 
 impl From<&str> for Identifier {
     fn from(s: &str) -> Self {
@@ -153,6 +138,7 @@ impl From<ArenaType> for RoxType {
             semant::BOOL_TYPE_VAL => RoxType::Bool,
             semant::STRING_TYPE_VAL => RoxType::String,
             semant::VOID_TYPE_VAL => RoxType::Void,
+            semant::ARRAY_TYPE_VAL => RoxType::Array,
             x => {
                 dbg!(x);
                 panic!("Rox does not yet support user-defined types")
@@ -176,6 +162,7 @@ impl Into<ArenaType> for RoxType {
 #[derive(Clone, Debug)]
 pub struct FunctionDeclaration {
     pub name: Identifier,
+    pub generics: Vec<Identifier>,
     pub params: Vec<Param>,
     pub return_type: Option<Identifier>,
 }
@@ -186,7 +173,13 @@ pub enum Statement {
     Return(Option<Box<Expression>>),
     Block(Block),
     IfElse(Box<Expression>, Block, Option<Block>),
-    FunctionDeclaration(Identifier, Vec<Param>, Option<Identifier>, Block),
+    FunctionDeclaration(
+        Identifier,
+        Option<Vec<Identifier>>,
+        Vec<Param>,
+        Option<Identifier>,
+        Block,
+    ),
 }
 
 #[derive(Debug)]

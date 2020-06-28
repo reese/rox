@@ -1,23 +1,26 @@
 use crate::roxc::Identifier;
+use std::collections::HashMap;
 
 pub type ArenaType = usize;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
     /// A `Function` is much like an `Operator` in the sense
-    /// that it is the concrete implementation of
-    /// a map from some types to other types
+    /// that it is the implementation of mapping from some type
+    /// to another type. However, what those types are
+    /// may not be known until the function is called, which
+    /// is why we have the optional types here.
     Function {
         id: ArenaType,
         name: Identifier,
         arg_types: Vec<ArenaType>,
         return_types: Vec<ArenaType>,
     },
-    /// This `Operator` struct represents an `n`-ary
-    /// constructor to create a new type from `n` existing types
-    Operator {
+    Struct {
         name: Identifier,
-        types: Vec<ArenaType>,
+        generic_types: Vec<String>,
+        fields: HashMap<Identifier, ArenaType>,
+        // TODO: support `traits: Vec<Trait>` for this and with generics
     },
     Variable {
         id: ArenaType,
@@ -26,12 +29,18 @@ pub enum Type {
 }
 
 impl Type {
-    pub(crate) fn new_operator(
+    pub(crate) fn new_struct(
         name: Identifier,
-        types: Vec<ArenaType>,
+        generic_types: Vec<String>,
+        fields: HashMap<Identifier, ArenaType>,
     ) -> Type {
-        Type::Operator { name, types }
+        Type::Struct {
+            name,
+            generic_types,
+            fields,
+        }
     }
+
     pub(crate) fn new_variable(id: ArenaType) -> Type {
         Type::Variable { id, instance: None }
     }
@@ -78,12 +87,13 @@ pub fn new_variable(types: &mut Vec<Type>) -> ArenaType {
     types.len() - 1
 }
 
-pub fn new_operator(
+pub fn new_struct(
     types: &mut Vec<Type>,
     name: Identifier,
-    operator_types: Vec<ArenaType>,
+    generic_types: Vec<String>,
+    operator_types: HashMap<Identifier, ArenaType>,
 ) -> ArenaType {
-    let type_ = Type::new_operator(name, operator_types);
+    let type_ = Type::new_struct(name, generic_types, operator_types);
     types.push(type_);
     types.len() - 1
 }

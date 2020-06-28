@@ -38,7 +38,7 @@ pub const BOOL_TYPE_VAL: ArenaType = 2;
 pub const STRING_TYPE_VAL: ArenaType = 3;
 pub const ARRAY_TYPE_VAL: ArenaType = 4;
 
-pub(crate) type Env = HashMap<Identifier, ArenaType>;
+pub(crate) type Env = HashMap<String, ArenaType>;
 
 /// # Type Checking
 /// `analyse_program` is the top level function from which we
@@ -103,13 +103,22 @@ fn analyse_statement(
                 tagged_else_block.map(|r| r.unwrap()),
             ))
         }
-        FunctionDeclaration(name, params, return_type, statements) => {
-            let param_types = get_param_types(types, env, &params)?;
-            let result_type =
-                return_type.clone().map(|t| *env.get(&t).unwrap());
+        FunctionDeclaration(
+            name,
+            generics,
+            params,
+            return_type,
+            statements,
+        ) => {
+            let generic_types = generics.unwrap_or(Vec::new());
+            let param_types =
+                get_param_types(types, env, &params, generic_types.as_ref())?;
+            let result_type = return_type
+                .clone()
+                .map(|t| *env.get(&t.get_name()).unwrap());
             let new_env = env.clone();
             if let Some(return_) = return_type.clone() {
-                let type_ = new_env.get(&return_).unwrap();
+                let type_ = new_env.get(&return_.get_name()).unwrap();
                 unify(types, result_type.unwrap(), *type_);
             }
             let new_non_generic = non_generic.clone();
@@ -160,9 +169,10 @@ fn analyse_statement(
                 arg_types.as_ref(),
                 return_type_vec.as_slice(),
             );
-            env.insert(name.clone(), new_arena_type);
+            env.insert(name.get_name(), new_arena_type);
             let declaration = syntax::FunctionDeclaration {
                 name,
+                generics: generic_types,
                 params,
                 return_type,
             };
@@ -215,7 +225,7 @@ fn get_arg_types(
     param_types
         .iter()
         .map(|(name, arg_type)| {
-            new_env.insert(name.clone(), *arg_type);
+            new_env.insert(name.get_name(), *arg_type);
             new_non_generic.insert(*arg_type);
             Ok(*arg_type)
         })
@@ -226,15 +236,28 @@ fn get_param_types(
     types: &mut Vec<Type>,
     env: &mut Env,
     params: &[Param],
+    generics: &[Identifier],
 ) -> Result<Vec<(Identifier, usize)>> {
     params
         .iter()
         .map(|(param_name, param_type_name)| {
             let variable = new_variable(types);
-            let param_arena_type = get_type(param_type_name, env)?;
-            unify(types, variable, param_arena_type);
-            env.insert(param_name.clone(), param_arena_type);
-            Ok((param_name.clone(), param_arena_type))
+            if !generics.contains(param_type_name) {
+                let param_arena_type = get_type(param_type_name, env)?;
+                unify(types, variable, param_arena_type);
+                env.insert(param_name.get_name(), param_arena_type);
+                Ok((param_name.clone(), param_arena_type))
+            } else {
+                let generic_type = new_struct(
+                    types,
+                    param_type_name.clone(),
+                    Vec::new(),
+                    HashMap::new(),
+                );
+                unify(types, variable, generic_type);
+                env.insert(param_name.get_name(), generic_type);
+                Ok((param_name.clone(), generic_type))
+            }
         })
         .collect::<Result<Vec<_>>>()
 }
@@ -246,12 +269,12 @@ fn analyse_expression(
     non_generic: &HashSet<ArenaType>,
 ) -> Result<TaggedExpression> {
     match node {
-        Expression::Assignment(name, expression) => {
+        Expression::Assignment(assignment_expression, result_expression) => {
             let tagged_expression =
-                analyse_expression(types, *expression, env, non_generic)?;
-            let variable_type = env.get(&name).unwrap();
-            unify(types, tagged_expression.clone().into(), *variable_type);
-            Ok(TaggedExpression::Assignment(name, Box::new(tagged_expression)))
+                analyse_expression(types, *result_expression, env, non_generic)?;
+            let tagged_assignee = analyse_expression(types, *assignment_expression, env, non_generic)?;
+            unify(types, tagged_assignee.clone().into(), tagged_expression.clone().into());
+            Ok(TaggedExpression::Assignment(Box::new(tagged_assignee), Box::new(tagged_expression)))
         }
         Expression::Identifier(ref name) => {
             let arena_type = get_type(name, env)?;
@@ -268,7 +291,7 @@ fn analyse_expression(
                 analyse_expression(types, *expression, env, non_generic)?;
             let variable = new_variable(types);
             unify(types, variable, tagged_expression.clone().into());
-            env.insert(name.clone(), tagged_expression.clone().into());
+            env.insert(name.get_name(), tagged_expression.clone().into());
             Ok(TaggedExpression::Variable(name, Box::new(tagged_expression)))
         }
         Expression::Or(left, right) => {
@@ -315,10 +338,10 @@ fn analyse_expression(
             Ok(TaggedExpression::Unary(operator, tagged_expression.into()))
         }
         Expression::FunctionCall(name, arg_expressions) => {
-            let function_arena_type = *env.get(&name).unwrap();
+            let function_arena_type = *env.get(&name.get_name()).unwrap();
             let function_type_signature =
                 types.get(function_arena_type).unwrap().clone();
-            if let Type::Function { return_types, name, .. } = function_type_signature
+            if let Type::Function { id: _, arg_types: _, return_types, name } = function_type_signature
             {
                 let tagged_arg_expressions =
                     arg_expressions
@@ -330,6 +353,7 @@ fn analyse_expression(
                                 env,
                                 non_generic,
                             )
+                        // TODO: Once we see the generics in the func decl, how do we tag the expression with it?
                         })
                         .collect::<Result<Vec<_>>>()?
                         .iter()
@@ -362,7 +386,7 @@ fn analyse_expression(
                 panic!("Type mismatch: tried to call an object that is not a function")
             }
         }
-        Expression::Array(_) => todo!(),
+        Expression::Array(type_identifier, length) => Ok(TaggedExpression::Array(type_identifier.clone(), length, get_type(&type_identifier, env)?.into())),
         Expression::ParseError => panic!("Encountered errors while parsing, cannot type check invalid syntax."),
     }
 }
@@ -414,26 +438,32 @@ fn unify(types: &mut Vec<Type>, first_type: ArenaType, second_type: ArenaType) {
             }
         }
         (
-            Type::Operator {
+            Type::Struct {
                 name: left_name,
-                types: left_types,
+                generic_types: left_generics,
+                fields: left_fields,
             },
-            Type::Operator {
+            Type::Struct {
                 name: right_name,
-                types: right_types,
+                generic_types: right_generics,
+                fields: right_fields,
             },
         ) => {
-            if left_name != right_name || left_types.len() != right_types.len()
+            if left_name != right_name
+                || left_fields.len() != right_fields.len()
+                || left_generics.len() != right_generics.len()
             {
-                panic!("Type mismatch")
+                panic!("Type mismatch: {:?} != {:?}", left_name, right_name)
             } else {
-                for (p, q) in left_types.iter().zip(right_types.iter()) {
+                for ((_, p), (_, q)) in
+                    left_fields.iter().zip(right_fields.iter())
+                {
                     unify(types, *p, *q);
                 }
             }
         }
         (Type::Function { .. }, Type::Variable { .. })
-        | (Type::Operator { .. }, Type::Variable { .. }) => {
+        | (Type::Struct { .. }, Type::Variable { .. }) => {
             unify(types, second_pruned, first_pruned)
         }
         (
@@ -458,15 +488,15 @@ fn unify(types: &mut Vec<Type>, first_type: ArenaType, second_type: ArenaType) {
                 unify(types, *p, *q);
             }
         }
-        (Type::Function { .. }, Type::Operator { .. })
-        | (Type::Operator { .. }, Type::Function { .. }) => {
+        (Type::Function { .. }, Type::Struct { .. })
+        | (Type::Struct { .. }, Type::Function { .. }) => {
             panic!("Cannot unify function and operator")
         }
     }
 }
 
 fn get_type(name: &Identifier, env: &Env) -> Result<ArenaType> {
-    match env.get(name) {
+    match env.get(&name.get_name()) {
         Some(arena_type) => Ok(*arena_type),
         None => Err(RoxError::new(
             PathBuf::from("./src/roxc/semant/mod.rs"), // TODO: Actually pass the file in here
