@@ -45,6 +45,11 @@ impl RoxError {
         }
     }
 
+    pub fn with_file_placeholder(message: &str) -> Self {
+        let path = PathBuf::from("./scratch/test.rox");
+        Self::new(path, message)
+    }
+
     pub fn from_error_recoveries<T: Clone + Into<PathBuf>>(
         error_vec: std::vec::Vec<
             lalrpop_util::ErrorRecovery<

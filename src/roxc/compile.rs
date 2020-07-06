@@ -1,18 +1,14 @@
-use crate::roxc::tagged_syntax::{TaggedDeclaration, TaggedStatement};
 use crate::roxc::{
-    analyse_program, Declaration, FunctionDeclaration, FunctionTranslator,
-    Identifier, Result, RoxError, Stack,
+    analyse_program, get_builtin_types, get_cranelift_type, Declaration,
+    FunctionDeclaration, FunctionTranslator, Identifier, Result, Stack,
+    TaggedDeclaration, TaggedStatement,
 };
 use cranelift::codegen;
 use cranelift::prelude::*;
 use cranelift_codegen::isa::CallConv;
 use cranelift_module::{Backend, DataContext, Linkage, Module};
-use im::HashMap;
 use std::borrow::Borrow;
-use std::fs::read_to_string;
-use std::path::PathBuf;
-
-lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
+use std::collections::HashMap;
 
 pub struct Compiler<T: Backend> {
     function_builder_context: FunctionBuilderContext,
@@ -26,18 +22,7 @@ impl<T: Backend> Compiler<T> {
     pub fn new(module: Module<T>) -> Self {
         let mut environment_stack = Stack::new();
         environment_stack.push(HashMap::new());
-        let mut function_stack = Stack::new();
-        function_stack.push(HashMap::new());
-        // TODO: Move this into where we add libc types earlier
-        function_stack.top_mut().insert(
-            Identifier::new_non_generic("puts".to_string()),
-            FunctionDeclaration {
-                name: Identifier::new_non_generic("puts".to_string()),
-                generics: Vec::new(),
-                params: vec![("arg".into(), "String".into())],
-                return_type: None,
-            },
-        );
+        let (_, _, function_stack) = get_builtin_types();
 
         Compiler {
             function_builder_context: FunctionBuilderContext::new(),
@@ -50,46 +35,20 @@ impl<T: Backend> Compiler<T> {
 
     pub fn compile(
         &mut self,
-        file: impl Into<PathBuf> + std::clone::Clone,
+        declarations: Vec<Declaration>,
     ) -> Result<Vec<()>> {
-        let declarations_result = self.parse_source_code(file.into());
-        match declarations_result {
-            Ok(declarations) => self.compile_declarations(&declarations),
-            Err(rox_error) => Err(rox_error),
-        }
+        self.compile_declarations(&declarations)
     }
 
     pub fn finish(self) -> T::Product {
         self.module.finish()
     }
 
-    fn parse_source_code(
-        &self,
-        file: impl Into<PathBuf> + std::clone::Clone,
-    ) -> Result<Vec<Declaration>> {
-        let source = read_to_string(file.clone().into()).unwrap();
-        let mut errors = Vec::new();
-        let declarations = rox_parser::ProgramParser::new()
-            .parse(&mut errors, &source)
-            .map_err(|e| {
-                RoxError::from_parse_error(
-                    &e,
-                    PathBuf::from("./scratch/test.rox"),
-                )
-            })?;
-        match errors {
-            empty_vec if empty_vec.is_empty() => Ok(declarations),
-            error_vec => {
-                Err(RoxError::from_error_recoveries(error_vec, file).unwrap())
-            }
-        }
-    }
-
     fn compile_declarations(
         &mut self,
         declarations: &[Declaration],
     ) -> Result<Vec<()>> {
-        let tagged_declarations = analyse_program(declarations)?;
+        let tagged_declarations = analyse_program(declarations.to_vec())?;
         tagged_declarations
             .iter()
             .map(|declaration| Ok(self.translate_declaration(declaration)?))
@@ -110,24 +69,28 @@ impl<T: Backend> Compiler<T> {
                     ) => {
                         let FunctionDeclaration {
                             name: func_name,
-                            generics,
                             params,
                             return_type,
                         } = func_declaration;
                         let mut signature = Signature::new(CallConv::SystemV);
                         params.iter().for_each(|(_, type_str)| {
-                            let codegen_type = type_str.get_type(
+                            let codegen_type = get_cranelift_type(
+                                type_str,
                                 self.module.target_config().pointer_type(),
                             );
-                            signature.params.push(AbiParam::new(codegen_type));
+                            if codegen_type != types::INVALID {
+                                signature
+                                    .params
+                                    .push(AbiParam::new(codegen_type));
+                            }
                         });
 
-                        if let Some(return_) = return_type {
-                            signature.returns.push(AbiParam::new(
-                                return_.get_type(
-                                    self.module.target_config().pointer_type(),
-                                ),
-                            ));
+                        let codegen_type = get_cranelift_type(
+                            return_type,
+                            self.module.target_config().pointer_type(),
+                        );
+                        if codegen_type != types::INVALID {
+                            signature.returns.push(AbiParam::new(codegen_type));
                         }
 
                         codegen_context.func.name =
@@ -141,7 +104,6 @@ impl<T: Backend> Compiler<T> {
 
                         let function_declaration = FunctionDeclaration {
                             name: func_name.clone(),
-                            generics: generics.clone(),
                             params: params.clone(),
                             return_type: return_type.clone(),
                         };

@@ -1,4 +1,4 @@
-use crate::roxc::{Block, Declaration, Expression, Identifier, Operation, Param, Statement, Unary};
+use crate::roxc::{Block, Declaration, Expression, Identifier, Operation, Param, TypeName, Statement, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
@@ -13,7 +13,7 @@ TopLevelFunctionDeclaration: Declaration = {
 }
 
 Function: Box<Statement> = {
-    "fn" <NonGenericIdentifier> <("<" <Comma<NonGenericIdentifier>> ">")?> "(" <Params> ")" <(ReturnType)?> <Block> => Box::new(Statement::FunctionDeclaration(<>))
+    "fn" <i:Identifier> <generics:("<" <Comma<Identifier>> ">")?> "(" <p:Params> ")" <return_:("->" <Type>)?> <b:Block> => Box::new(Statement::FunctionDeclaration(i, generics, p, return_.unwrap_or(Box::new(TypeName::Type("Void".to_string()))), b))
 }
 
 Block: Block = {
@@ -41,7 +41,7 @@ Assignment: Box<Expression> = {
     // TODO: Allow for assignment to function results
     // i.e. `some_call().attribute = 3;`
     <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
-    "let" <NonGenericIdentifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
+    "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
     LogicOr
 }
 
@@ -84,8 +84,14 @@ Unary: Box<Expression> = {
 };
 
 Call: Box<Expression> = {
-    <i: NonGenericIdentifier> "(" <args: (Arguments)?> ")" => Box::new(Expression::FunctionCall(i, args.unwrap_or(Vec::new()))),
+    <i: Identifier> <generics:( "::" "<" <Comma<Identifier>> ">")?> "(" <args: (Arguments)?> ")" =>
+        Box::new(Expression::FunctionCall(i, generics.unwrap_or(Vec::new()), args.unwrap_or(Vec::new()))),
+    Access,
     Primary
+}
+
+Access: Box<Expression> = {
+    <Call> "[" <Call> "]" => Box::new(Expression::Access(<>)),
 }
 
 ComparisonOp: Operation = {
@@ -108,11 +114,7 @@ Params: Vec<Param> = {
 }
 
 Param: Param = {
-    <i:NonGenericIdentifier> ":" <t:Identifier> => (i, t)
-}
-
-ReturnType: Identifier = {
-    "->" <Identifier>
+    <i:Identifier> ":" <t:Type> => (i, t.as_ref().clone())
 }
 
 Arguments: Vec<Box<Expression>> = {
@@ -137,28 +139,32 @@ Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
     Num => Box::new(Expression::Number(<>)),
     String => Box::new(Expression::String(<>)),
-    NonGenericIdentifier => Box::new(Expression::Identifier(<>)),
+    Identifier => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
-    "array" "<" <Identifier> ">" "[" <Num> "]" => Box::new(Expression::Array(<>)),
+    "[" <Comma<Expression>> "]" => Box::new(Expression::Array(<>)),
     ! => {
         errors.push(<>);
         Box::new(Expression::ParseError)
     }
 };
 
+Identifier: Identifier = {
+    r"[a-zA-Z_]([a-zA-Z0-9_?!-])*" => String::from(<>)
+}
+
+Type: Box<TypeName> = {
+    Identifier => Box::new(TypeName::Type(<>)),
+    <i: Identifier> "<" <t:Comma<Type>> ">" => Box::new(TypeName::GenericType(<>)),
+    FunctionType,
+}
+
+FunctionType: Box<TypeName> = {
+    "(" <types:Comma<Type>> ")" "->" <t:Type> => Box::new(TypeName::Function(types, t)),
+}
+
 Boolean: bool = {
     "true" => true,
     "false" => false,
-}
-
-Identifier: Identifier = { GenericIdentifier, NonGenericIdentifier }
-
-GenericIdentifier: Identifier = {
-    <i: NonGenericIdentifier> "<" <generics: Comma<Identifier>> ">" => Identifier::new(i.get_name(), generics),
-}
-
-NonGenericIdentifier: Identifier = {
-    r"[a-zA-Z_]([a-zA-Z0-9_?!-])*" => Identifier::new(String::from(<>), Vec::new())
 }
 
 Num: f64 = {

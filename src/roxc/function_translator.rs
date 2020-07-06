@@ -1,12 +1,12 @@
-use crate::roxc::semant::tagged_syntax::TaggedExpression;
-use crate::roxc::tagged_syntax::TaggedStatement;
+use crate::roxc::semant;
 use crate::roxc::{
-    syntax, FunctionDeclaration, Identifier, Param, RoxType, Stack,
+    get_cranelift_type, parser, FunctionDeclaration, Identifier, Stack,
+    TaggedExpression, TaggedStatement,
 };
 use cranelift::prelude::*;
 use cranelift_module::{Backend, DataContext, Linkage, Module, ModuleError};
-use im::HashMap;
 use std::borrow::Borrow;
+use std::collections::HashMap;
 
 pub struct FunctionTranslator<'func, T: Backend> {
     builder: &'func mut FunctionBuilder<'func>,
@@ -35,14 +35,14 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
     pub(crate) fn translate_function(
         &mut self,
-        params: &[Param],
-        block: &[Box<TaggedStatement>],
+        params: &[(Identifier, semant::Type)],
+        block: &[TaggedStatement],
     ) {
         self.initialize_block(params);
         self.translate_block(block);
 
         // Add return if block doesn't have a return statement
-        if !block.iter().any(|statement| match **statement {
+        if !block.iter().any(|statement| match *statement {
             TaggedStatement::Return(_) => true,
             _ => false,
         }) {
@@ -52,7 +52,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         self.builder.finalize();
     }
 
-    fn translate_block(&mut self, block: &[Box<TaggedStatement>]) {
+    fn translate_block(&mut self, block: &[TaggedStatement]) {
         block.iter().for_each(|statement| {
             self.translate_statement(statement);
         })
@@ -97,7 +97,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
     #[allow(clippy::vec_box)]
     fn read_into_block(
         &mut self,
-        maybe_statements: Option<Vec<Box<TaggedStatement>>>,
+        maybe_statements: Option<Vec<TaggedStatement>>,
         conditional_block: Block,
         merge_block: Block,
     ) {
@@ -106,10 +106,10 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         self.builder.seal_block(conditional_block);
         if let Some(if_statements) = maybe_statements {
             if_statements.iter().for_each(|statement| {
-                if let TaggedStatement::Return(_) = statement.as_ref() {
+                if let TaggedStatement::Return(_) = statement {
                     has_return = true;
                 }
-                self.translate_statement(statement.as_ref());
+                self.translate_statement(statement);
             });
         }
         if !has_return {
@@ -134,14 +134,15 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
                 let mut signature = self.module.make_signature();
                 params.iter().for_each(|(_, type_name)| {
-                    signature.params.push(AbiParam::new(
-                        type_name.get_type(self.pointer_type()),
-                    ));
+                    signature.params.push(AbiParam::new(get_cranelift_type(
+                        type_name,
+                        self.pointer_type(),
+                    )));
                 });
-                if let Some(return_) = return_type {
-                    signature.returns.push(AbiParam::new(
-                        return_.get_type(self.pointer_type()),
-                    ));
+                let codegen_type =
+                    get_cranelift_type(return_type, self.pointer_type());
+                if codegen_type != types::INVALID {
+                    signature.returns.push(AbiParam::new(codegen_type));
                 }
 
                 let callee = self
@@ -173,18 +174,20 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             TaggedExpression::Number(num) => {
                 vec![self.builder.ins().f64const(*num)]
             }
-            TaggedExpression::Array(
-                interior_type_identifier,
-                length,
-                _rox_type,
-            ) => {
+            TaggedExpression::Array(tagged_expressions, _type_) => {
                 self.data_context.define_zeroinit(
-                    (self.pointer_type().bytes() * (*length as u32)) as usize,
+                    (get_cranelift_type(
+                        &tagged_expressions.first().unwrap().clone().into(),
+                        self.pointer_type(),
+                    )
+                    .bytes()
+                        * (tagged_expressions.len() as u32))
+                        as usize,
                 );
                 let data_id = self
                     .module
                     .declare_data(
-                        interior_type_identifier.get_name().as_ref(),
+                        format!("{:?}", tagged_expressions).as_ref(), // TODO: Surely there's a better way to do this?
                         Linkage::Export,
                         true,
                         false,
@@ -230,7 +233,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
                 vec![self.builder.ins().global_value(pointer_type, value)]
             }
-            TaggedExpression::Variable(name, expression) => {
+            TaggedExpression::Variable(name, expression, _) => {
                 let value = self.translate_expression(expression)[0];
                 let variable_env = self.variables.top_mut();
                 let variable =
@@ -250,7 +253,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 vec![self.builder.use_var(*variable)]
             }
             TaggedExpression::Operation(left, operation, right) => {
-                use syntax::Operation::*;
+                use parser::Operation::*;
                 let lval = self.translate_expression(left)[0];
                 let rval = self.translate_expression(right)[0];
                 let result = match operation {
@@ -275,14 +278,11 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 };
                 vec![result]
             }
-            x => {
-                dbg!(x);
-                unimplemented!()
-            }
+            x => unimplemented!("{:?}", x),
         }
     }
 
-    fn initialize_block(&mut self, params: &[Param]) {
+    fn initialize_block(&mut self, params: &[(Identifier, semant::Type)]) {
         let entry_block = self.builder.create_block();
         self.builder
             .append_block_params_for_function_params(entry_block);
@@ -293,8 +293,10 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             let (name, type_) = params.get(index).unwrap().clone();
             let variable = Variable::new(index);
             self.variables.top_mut().insert(name, variable);
-            self.builder
-                .declare_var(variable, type_.get_type(self.pointer_type()));
+            self.builder.declare_var(
+                variable,
+                get_cranelift_type(&type_, self.pointer_type()),
+            );
             self.builder.def_var(variable, *param);
         });
     }
@@ -303,35 +305,10 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         &self,
         tagged_expression: &TaggedExpression,
     ) -> Type {
-        use TaggedExpression::*;
-        match tagged_expression {
-            Array(_, _, _) => {
-                RoxType::Array.get_codegen_type(self.pointer_type())
-            }
-            String(_) => RoxType::String.get_codegen_type(self.pointer_type()),
-            Number(_) | Unary(_, _) => {
-                RoxType::Number.get_codegen_type(self.pointer_type())
-            }
-            Operation(_, _, _) => {
-                RoxType::Number.get_codegen_type(self.pointer_type())
-            }
-            Boolean(_) | And(_, _) => {
-                RoxType::Bool.get_codegen_type(self.pointer_type())
-            }
-            Assignment(_, expression) => self.get_expression_type(expression),
-            FunctionCall(name, _, _rox_type) => {
-                let declaration = self.functions.top().get(name).unwrap();
-                let FunctionDeclaration { return_type, .. } = declaration;
-                return_type
-                    .as_ref()
-                    // `INVALID` is just `VOID`
-                    .map_or(types::INVALID, |t| t.get_type(self.pointer_type()))
-            }
-            x => {
-                dbg!(x);
-                todo!()
-            }
-        }
+        get_cranelift_type(
+            &(tagged_expression.clone().into()),
+            self.pointer_type(),
+        )
     }
 
     /// Note that reading a string into bytes with `string.into_bytes()`

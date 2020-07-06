@@ -18,7 +18,8 @@ mod roxc;
 
 pub use crate::roxc::Result;
 use crate::roxc::{
-    init_object_module, init_simplejit_module, Compiler, RoxError,
+    init_object_module, init_simplejit_module, parse_file, parse_string,
+    Compiler, Declaration, RoxError,
 };
 use codespan_reporting::files::SimpleFile;
 use core::mem;
@@ -64,8 +65,28 @@ pub fn build_source_string(
 
 /// Run the given file with the SimpleJITBackend
 pub fn run_file(path: PathBuf) -> Result<isize> {
+    let declarations = parse_file(path)?;
+    execute_declarations(declarations)
+}
+
+/// Executes the raw source string with the JIT compiler.
+/// ```
+/// use rox::execute_source_string;
+/// let source = r#"
+/// fn main() {
+///     puts("Hello, world!");
+/// }
+/// "#;
+/// execute_source_string(source);
+/// ```
+pub fn execute_source_string(source: &str) -> Result<isize> {
+    let declarations = parse_string(source)?;
+    execute_declarations(declarations)
+}
+
+fn execute_declarations(declarations: Vec<Declaration>) -> Result<isize> {
     let mut compiler = Compiler::new(init_simplejit_module());
-    let compile_result = compiler.compile(&path);
+    let compile_result = compiler.compile(declarations);
     if compile_result.is_err() {
         return Err(compile_result.err().unwrap());
     }
@@ -83,24 +104,6 @@ pub fn run_file(path: PathBuf) -> Result<isize> {
     }
 }
 
-/// Executes the raw source string with the JIT compiler.
-/// ```
-/// use rox::execute_source_string;
-/// let source = r#"
-/// fn main() {
-///     puts("Hello, world!");
-/// }
-/// "#;
-/// execute_source_string(source);
-/// ```
-pub fn execute_source_string(source: &str) -> Result<isize> {
-    let mut mock_file = temp_dir();
-    mock_file.push("temp.rox");
-    let mut file = File::create(&mock_file).unwrap();
-    file.write_all(source.as_bytes()).unwrap();
-    run_file(mock_file)
-}
-
 /// This function generates the native object file
 /// and links it using the machine's default C compiler.
 fn compile_and_link(input_file: PathBuf, output: PathBuf) -> Result<Output> {
@@ -113,10 +116,11 @@ fn compile_and_link(input_file: PathBuf, output: PathBuf) -> Result<Output> {
 
 fn compile_file<T>(input_file: T, object_file_output: T) -> Result<()>
 where
-    T: Into<PathBuf> + Sized,
+    T: Into<PathBuf> + Sized + Clone,
 {
+    let declarations = parse_file(input_file)?;
     let mut compiler = Compiler::new(init_object_module());
-    match compiler.compile(input_file.into()) {
+    match compiler.compile(declarations) {
         Err(err) => Err(err),
         Ok(_) => {
             let product = compiler.finish();
