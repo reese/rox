@@ -94,7 +94,7 @@ impl<T: Backend> Compiler<T> {
                         }
 
                         codegen_context.func.name =
-                            String::from(func_name.clone()).parse().unwrap();
+                            func_name.clone().parse().unwrap();
                         codegen_context.func.signature = signature;
 
                         let mut builder = FunctionBuilder::new(
@@ -124,7 +124,7 @@ impl<T: Backend> Compiler<T> {
                         let func = self
                             .module
                             .declare_function(
-                                String::from(func_name.clone()).as_str(),
+                                func_name.clone().as_str(),
                                 Linkage::Export,
                                 &codegen_context.func.signature,
                             )

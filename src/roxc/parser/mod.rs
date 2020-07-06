@@ -27,7 +27,7 @@ pub fn parse_string(source: &str) -> Result<Vec<Declaration>> {
 pub(crate) fn parse_file(
     file: impl Into<PathBuf> + std::clone::Clone,
 ) -> Result<Vec<Declaration>> {
-    let source = read_to_string(file.clone().into()).unwrap();
+    let source = read_to_string(file.into()).unwrap();
     parse_string(&source)
 }
 

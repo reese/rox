@@ -254,14 +254,14 @@ fn translate_statement(
             func_body,
         ) => {
             let mut local_type_env = type_env.clone();
-            maybe_formal_arguments.clone().map(|formal_arguments| {
+            if let Some(formal_arguments) = maybe_formal_arguments.clone() {
                 formal_arguments.iter().for_each(|ty| {
                     local_type_env.insert(
                         ty.clone(),
                         TypeValue::Type(Type::Variable(ty.clone())),
                     );
                 });
-            });
+            };
             let function_decl_types = parameters
                 .iter()
                 .map(|(param_name, type_name)| {
@@ -273,7 +273,7 @@ fn translate_statement(
                     Ok(type_)
                 })
                 .collect::<Result<Vec<Type>>>()?;
-            let mut parameter_types = function_decl_types.clone();
+            let mut parameter_types = function_decl_types;
 
             let return_type = translate_type_identifier(
                 &mut local_type_env,
@@ -284,7 +284,7 @@ fn translate_statement(
             variable_env.insert(
                 func_name.clone(),
                 Type::PolymorphicType(
-                    maybe_formal_arguments.unwrap_or_else(|| Vec::new()),
+                    maybe_formal_arguments.unwrap_or_else(Vec::new),
                     Box::new(Type::Apply(
                         TypeConstructor::Arrow,
                         parameter_types.clone(),
@@ -323,11 +323,11 @@ fn translate_statement(
             )?))
         }
         Statement::Return(maybe_expression) => {
-            if maybe_expression.is_some() {
+            if let Some(expr) = maybe_expression {
                 Ok(TaggedStatement::Return(Some(translate_expression(
                     type_env,
                     variable_env,
-                    maybe_expression.unwrap().as_ref().clone(),
+                    expr.as_ref().clone(),
                 )?)))
             } else {
                 Ok(TaggedStatement::Return(None))
@@ -507,7 +507,7 @@ fn translate_expression(
                 expand(tagged_function_identifier.into())
             {
                 let mut all_types: TypeEnv = type_env
-                    .into_iter()
+                    .iter_mut()
                     .map(|(n, t)| (n.clone(), t.clone()))
                     .collect();
                 generics
@@ -559,10 +559,12 @@ fn translate_expression(
             Box::new(
                 variable_env
                     .get(&x.clone())
-                    .ok_or(RoxError::with_file_placeholder(
-                        format!("Encountered unknown identifier: {}", x)
-                            .as_ref(),
-                    ))?
+                    .ok_or_else(|| {
+                        RoxError::with_file_placeholder(
+                            format!("Encountered unknown identifier: {}", x)
+                                .as_ref(),
+                        )
+                    })?
                     .clone(),
             ),
         )),
@@ -579,9 +581,9 @@ fn translate_expression(
                 right.as_ref().clone(),
             )?;
             Ok(TaggedExpression::Operation(
-                Box::new(tagged_left.clone()),
+                Box::new(tagged_left),
                 operation,
-                Box::new(tagged_right.clone()),
+                Box::new(tagged_right),
             ))
         }
         Expression::Number(n) => Ok(TaggedExpression::Number(n)),

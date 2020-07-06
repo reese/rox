@@ -1,9 +1,9 @@
+#![allow(clippy::vec_box)]
 use crate::roxc::semant;
 use crate::roxc::{Type, TypeConstructor};
 use cranelift::prelude::types;
 
 #[derive(Clone, Debug)]
-#[allow(clippy::vec_box)]
 pub enum Expression {
     Access(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),

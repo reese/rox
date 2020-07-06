@@ -148,7 +148,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 let callee = self
                     .module
                     .declare_function(
-                        String::from(function_name.clone()).as_str(),
+                        function_name.clone().as_str(),
                         Linkage::Import,
                         &signature,
                     )
