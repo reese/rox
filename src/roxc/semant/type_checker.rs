@@ -264,7 +264,9 @@ fn translate_statement(
             let return_type = translate_type_identifier(
                 type_env,
                 return_type_name
-                    .unwrap_or(Box::new(TypeName::Type("Void".to_string())))
+                    .unwrap_or_else(|| {
+                        Box::new(TypeName::Type("Void".to_string()))
+                    })
                     .as_ref()
                     .clone(),
             )?;
@@ -275,13 +277,13 @@ fn translate_statement(
                     Vec::new(),
                     Box::new(Type::Apply(
                         TypeConstructor::Arrow,
-                        parameter_types.clone(),
+                        parameter_types,
                     )),
                 ),
             );
             Ok(TaggedStatement::ExternFunctionDeclaration(
                 FunctionDeclaration {
-                    name: func_name.clone(),
+                    name: func_name,
                     params: function_decl_types
                         .iter()
                         .map(|t| (String::new(), t.clone()))
@@ -322,7 +324,9 @@ fn translate_statement(
             let return_type = translate_type_identifier(
                 &mut local_type_env,
                 return_type_name
-                    .unwrap_or(Box::new(TypeName::Type("Void".to_string())))
+                    .unwrap_or_else(|| {
+                        Box::new(TypeName::Type("Void".to_string()))
+                    })
                     .as_ref()
                     .clone(),
             )?;
