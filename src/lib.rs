@@ -73,11 +73,12 @@ pub fn run_file(path: PathBuf) -> Result<isize> {
 /// ```
 /// use rox::execute_source_string;
 /// let source = r#"
+/// extern fn puts(String);
 /// fn main() {
 ///     puts("Hello, world!");
 /// }
 /// "#;
-/// execute_source_string(source);
+/// execute_source_string(source).unwrap();
 /// ```
 pub fn execute_source_string(source: &str) -> Result<isize> {
     let declarations = parse_string(source)?;
