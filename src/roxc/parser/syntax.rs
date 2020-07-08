@@ -97,11 +97,16 @@ pub enum Statement {
     Return(Option<Box<Expression>>),
     Block(Block),
     IfElse(Box<Expression>, Block, Option<Block>),
+    ExternFunctionDeclaration(
+        Identifier,
+        Vec<Box<TypeName>>,
+        Option<Box<TypeName>>,
+    ),
     FunctionDeclaration(
         Identifier,
         Option<Vec<Identifier>>,
         Vec<Param>,
-        Box<TypeName>,
+        Option<Box<TypeName>>,
         Block,
     ),
 }

@@ -66,6 +66,14 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             TaggedStatement::FunctionDeclaration(..) => {
                 panic!("For right now, functions can only be declared at the top level.")
             }
+            // The `extern` tag merely declares the function to the type checker
+            // The linker will then try to dynamically link the function call
+            // if one exists. For the most part, we use this as a way to use
+            // `libc` functions, but this could potentially be used to link a
+            // Rust runtime library, but that's still undetermined.
+            TaggedStatement::ExternFunctionDeclaration(decl) => {
+                self.functions.top_mut().insert(decl.name.clone(), decl.clone());
+            },
             TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
                     let returns = self.translate_expression(expression);

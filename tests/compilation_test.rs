@@ -4,6 +4,8 @@ extern crate rox;
 fn it_compiles_functions() {
     let result = rox::execute_source_string(
         r#"
+    extern fn puts(String);
+
     fn test(x: Number) -> Number {
         if x == 9 {
             return x + 1;
@@ -35,7 +37,6 @@ fn it_compiles_arrays() {
         let ten = test(9);
         let nine = test(1234);
         let x = "Hello, world!";
-        puts(x);
     }
     "#,
     );

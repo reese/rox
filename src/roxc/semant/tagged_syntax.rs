@@ -65,6 +65,7 @@ pub(crate) enum TaggedStatement {
     Expression(TaggedExpression),
     Return(Option<TaggedExpression>),
     IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
+    ExternFunctionDeclaration(FunctionDeclaration),
     FunctionDeclaration(FunctionDeclaration, TaggedBlock),
 }
 

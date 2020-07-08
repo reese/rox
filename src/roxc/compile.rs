@@ -63,6 +63,14 @@ impl<T: Backend> Compiler<T> {
             TaggedDeclaration::Function(func_declaration) => {
                 let mut codegen_context = self.module.make_context();
                 match func_declaration.borrow() {
+                    TaggedStatement::ExternFunctionDeclaration(
+                        function_declaration,
+                    ) => {
+                        self.function_stack.top_mut().insert(
+                            function_declaration.name.clone(),
+                            function_declaration.clone(),
+                        );
+                    }
                     TaggedStatement::FunctionDeclaration(
                         func_declaration,
                         block,

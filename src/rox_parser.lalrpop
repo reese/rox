@@ -13,7 +13,8 @@ TopLevelFunctionDeclaration: Declaration = {
 }
 
 Function: Box<Statement> = {
-    "fn" <i:Identifier> <generics:("<" <Comma<Identifier>> ">")?> "(" <p:Params> ")" <return_:("->" <Type>)?> <b:Block> => Box::new(Statement::FunctionDeclaration(i, generics, p, return_.unwrap_or(Box::new(TypeName::Type("Void".to_string()))), b))
+    "fn" <Identifier> <("<" <Comma<Identifier>> ">")?> "(" <Params> ")" <("->" <Type>)?> <Block> => Box::new(Statement::FunctionDeclaration(<>)),
+    "extern" "fn" <Identifier> "(" <Comma<Type>> ")" <("->" <Type>)?> ";" => Box::new(Statement::ExternFunctionDeclaration(<>))
 }
 
 Block: Block = {

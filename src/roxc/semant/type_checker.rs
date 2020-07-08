@@ -246,6 +246,50 @@ fn translate_statement(
                 })
                 .collect::<Result<Vec<_>>>()?,
         )),
+        Statement::ExternFunctionDeclaration(
+            func_name,
+            parameters,
+            return_type_name,
+        ) => {
+            let function_decl_types = parameters
+                .iter()
+                .map(|type_name| {
+                    translate_type_identifier(
+                        type_env,
+                        type_name.as_ref().clone(),
+                    )
+                })
+                .collect::<Result<Vec<Type>>>()?;
+            let mut parameter_types = function_decl_types.clone();
+            let return_type = translate_type_identifier(
+                type_env,
+                return_type_name
+                    .unwrap_or(Box::new(TypeName::Type("Void".to_string())))
+                    .as_ref()
+                    .clone(),
+            )?;
+            parameter_types.push(return_type.clone());
+            variable_env.insert(
+                func_name.clone(),
+                Type::PolymorphicType(
+                    Vec::new(),
+                    Box::new(Type::Apply(
+                        TypeConstructor::Arrow,
+                        parameter_types.clone(),
+                    )),
+                ),
+            );
+            Ok(TaggedStatement::ExternFunctionDeclaration(
+                FunctionDeclaration {
+                    name: func_name.clone(),
+                    params: function_decl_types
+                        .iter()
+                        .map(|t| (String::new(), t.clone()))
+                        .collect(),
+                    return_type,
+                },
+            ))
+        }
         Statement::FunctionDeclaration(
             func_name,
             maybe_formal_arguments,
@@ -277,7 +321,10 @@ fn translate_statement(
 
             let return_type = translate_type_identifier(
                 &mut local_type_env,
-                return_type_name.as_ref().clone(),
+                return_type_name
+                    .unwrap_or(Box::new(TypeName::Type("Void".to_string())))
+                    .as_ref()
+                    .clone(),
             )?;
             parameter_types.push(return_type.clone());
 
