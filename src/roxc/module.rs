@@ -9,6 +9,7 @@ pub(crate) fn init_object_module() -> Module<ObjectBackend> {
     let mut flags_builder = cranelift::codegen::settings::builder();
     flags_builder.enable("is_pic").unwrap();
     flags_builder.enable("enable_verifier").unwrap();
+    flags_builder.enable("enable_safepoints").unwrap();
     let flags = settings::Flags::new(flags_builder);
     let isa = codegen::isa::lookup(Triple::host()).unwrap().finish(flags);
 

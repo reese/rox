@@ -23,6 +23,15 @@ pub enum TypeConstructor {
     Unique(Box<TypeConstructor>),
 }
 
+impl TypeConstructor {
+    pub fn get_record_fields(&self) -> Vec<(Identifier, Type)> {
+        match self {
+            TypeConstructor::Record(fields) => fields.clone(),
+            _ => panic!("Tried to get records for non-record type") // TODO: improve error handling
+        }
+    }
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Type {
     Apply(TypeConstructor, Vec<Type>),

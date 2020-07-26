@@ -23,6 +23,10 @@ pub enum TaggedExpression {
     Operation(Box<TaggedExpression>, Operation, Box<TaggedExpression>),
     Or(Box<TaggedExpression>, Box<TaggedExpression>),
     String(String),
+    StructInstantiation(
+        Box<Type>,
+        Vec<(Identifier, Box<TaggedExpression>)>,
+    ),
     Unary(Unary, Box<TaggedExpression>, Box<Type>),
     Variable(Identifier, Box<TaggedExpression>, Box<Type>),
 }
@@ -35,6 +39,7 @@ impl Into<semant::Type> for TaggedExpression {
             | Array(_, t)
             | Assignment(_, _, t)
             | FunctionCall(_, _, t)
+            | StructInstantiation(t, _)
             | Identifier(_, t) => t.as_ref().clone(),
             And(_, _) | Boolean(_) => {
                 Type::Apply(TypeConstructor::Bool, Vec::new())
@@ -61,15 +66,10 @@ type TaggedBlock = Vec<TaggedStatement>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TaggedStatement {
-    Block(TaggedBlock),
     Expression(TaggedExpression),
-    Return(Option<TaggedExpression>),
-    IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
     ExternFunctionDeclaration(FunctionDeclaration),
     FunctionDeclaration(FunctionDeclaration, TaggedBlock),
-}
-
-#[derive(Debug)]
-pub(crate) enum TaggedDeclaration {
-    Function(TaggedStatement),
+    StructDeclaration,
+    IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
+    Return(Option<TaggedExpression>),
 }

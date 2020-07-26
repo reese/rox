@@ -21,12 +21,10 @@
 //! valid programs.
 //! To do this, we need to verify that all the application of our types are equal, or "unified."
 use crate::roxc::semant::types::{Type, TypeConstructor};
-use crate::roxc::semant::{
-    TaggedDeclaration, TaggedExpression, TaggedStatement,
-};
+use crate::roxc::semant::{TaggedExpression, TaggedStatement};
 use crate::roxc::{
-    builtins, Declaration, Expression, FunctionDeclaration, Identifier, Result,
-    RoxError, Statement, TypeName, Unary,
+    builtins, Expression, FunctionDeclaration, Identifier, Result, RoxError,
+    Statement, TypeName, Unary,
 };
 use std::collections::HashMap;
 
@@ -37,12 +35,19 @@ pub(crate) enum TypeValue {
 }
 
 impl TypeValue {
-    fn get_rox_type(&self) -> Type {
+    fn get_type(&self) -> Type {
         match self {
             TypeValue::Type(t) => t.clone(),
             TypeValue::Constructor(_) => {
                 panic!("Expected a type variable, not a type constructor")
             }
+        }
+    }
+
+    fn get_type_constructor(&self) -> TypeConstructor {
+        match self {
+            TypeValue::Type(_) => panic!("Expected type constructor, got type"),
+            TypeValue::Constructor(c) => c.clone(),
         }
     }
 }
@@ -77,7 +82,7 @@ fn substitute(ty: Type, env: &mut TypeEnv) -> Type {
             ),
         },
         Type::Variable(identifier) => match env.get(&identifier) {
-            Some(type_) => type_.clone().get_rox_type(),
+            Some(type_) => type_.clone().get_type(),
             None => Type::Variable(identifier),
         },
         Type::PolymorphicType(formal_parameters, type_) => {
@@ -212,40 +217,12 @@ fn zip_argument_types(names: Vec<Identifier>, types: Vec<Type>) -> TypeEnv {
         .collect::<HashMap<_, _>>()
 }
 
-fn translate_declaration(
-    type_env: &mut TypeEnv,
-    variable_env: &mut VariableEnv,
-    declaration: &Declaration,
-) -> Result<TaggedDeclaration> {
-    match declaration {
-        Declaration::Function(statement) => {
-            Ok(TaggedDeclaration::Function(translate_statement(
-                type_env,
-                variable_env,
-                statement.as_ref().clone(),
-            )?))
-        }
-    }
-}
-
 fn translate_statement(
     type_env: &mut TypeEnv,
     variable_env: &mut VariableEnv,
     statement: Statement,
 ) -> Result<TaggedStatement> {
     match statement {
-        Statement::Block(statements) => Ok(TaggedStatement::Block(
-            statements
-                .iter()
-                .map(|s| {
-                    translate_statement(
-                        type_env,
-                        variable_env,
-                        s.as_ref().clone(),
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?,
-        )),
         Statement::ExternFunctionDeclaration(
             func_name,
             parameters,
@@ -292,6 +269,53 @@ fn translate_statement(
                 },
             ))
         }
+        Statement::StructDeclaration(
+            struct_name,
+            maybe_formal_arguments,
+            fields,
+        ) => {
+            let mut local_type_env = type_env.clone();
+            let translated_formal_arguments = maybe_formal_arguments
+                .map(|generic_types| {
+                    Ok(generic_types
+                        .iter()
+                        .map(|t| {
+                            local_type_env.insert(
+                                t.clone(),
+                                TypeValue::Type(Type::Variable(t.clone())),
+                            );
+                            translate_type_identifier(
+                                &mut local_type_env,
+                                TypeName::Type(t.into()),
+                            )
+                        })
+                        .collect::<Result<Vec<_>>>()?)
+                })
+                .unwrap_or_else(|| Ok(Vec::new()))?;
+
+            let translated_fields = fields
+                .iter()
+                .map(|(field_name, type_name)| {
+                    let translated_type = translate_type_identifier(
+                        &mut local_type_env,
+                        type_name.as_ref().clone(),
+                    )?;
+                    Ok((field_name.clone(), translated_type))
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            dbg!(translated_fields.clone());
+
+            type_env.insert(
+                struct_name.clone(),
+                TypeValue::Type(Type::Apply(
+                    TypeConstructor::Record(translated_fields),
+                    translated_formal_arguments,
+                )),
+            );
+
+            Ok(TaggedStatement::StructDeclaration)
+        }
         Statement::FunctionDeclaration(
             func_name,
             maybe_formal_arguments,
@@ -313,7 +337,7 @@ fn translate_statement(
                 .map(|(param_name, type_name)| {
                     let type_ = translate_type_identifier(
                         &mut local_type_env,
-                        type_name.clone(),
+                        type_name.as_ref().clone(),
                     )?;
                     variable_env.insert(param_name.clone(), type_.clone());
                     Ok(type_)
@@ -533,10 +557,7 @@ fn translate_expression(
             let instantiated_generics = generic_type_idents
                 .iter()
                 .map(|i| {
-                    translate_type_identifier(
-                        type_env,
-                        TypeName::Type(i.clone()),
-                    )
+                    translate_type_identifier(type_env, i.as_ref().clone())
                 })
                 .collect::<Result<Vec<_>>>()?;
             let tagged_function_identifier = translate_expression(
@@ -571,10 +592,8 @@ fn translate_expression(
                             .collect::<Vec<_>>(),
                     )
                     .for_each(|(ident, type_)| {
-                        all_types.insert(
-                            ident,
-                            TypeValue::Type(type_.get_rox_type()),
-                        );
+                        all_types
+                            .insert(ident, TypeValue::Type(type_.get_type()));
                     });
 
                 if let Type::Apply(_constructor, mut types) =
@@ -638,6 +657,86 @@ fn translate_expression(
             ))
         }
         Expression::Number(n) => Ok(TaggedExpression::Number(n)),
+        Expression::StructInstantiation(
+            identifier,
+            maybe_generic_args,
+            field_params,
+        ) => {
+            let generic_args = maybe_generic_args
+                .map(|args| {
+                    args.iter()
+                        .map(|a| {
+                            translate_type_identifier(
+                                type_env,
+                                a.as_ref().clone(),
+                            )
+                        })
+                        .collect::<Result<Vec<_>>>()
+                })
+                .unwrap_or(Ok(Vec::new()))?;
+            let struct_type = type_env.get(&identifier).unwrap().get_type();
+
+            if let Type::PolymorphicType(generics, record_type_constructor) =
+                expand(struct_type.clone())
+            {
+                dbg!(record_type_constructor.clone());
+                let fields = Vec::new();
+                let mut all_types: TypeEnv = type_env
+                    .iter_mut()
+                    .map(|(n, t)| (n.clone(), t.clone()))
+                    .collect();
+                generics
+                    .iter()
+                    .cloned()
+                    .zip(
+                        generic_args
+                            .iter()
+                            .map(|t| TypeValue::Type(t.clone()))
+                            .collect::<Vec<_>>(),
+                    )
+                    .for_each(|(ident, type_)| {
+                        all_types
+                            .insert(ident, TypeValue::Type(type_.get_type()));
+                    });
+
+                if let Type::Apply(_constructor, _types) =
+                    *record_type_constructor
+                {
+                    let tagged_field_params = field_params
+                        .iter()
+                        .map(|(field_name, expr)| {
+                            let (_, type_) = fields
+                                .iter()
+                                .find(|(f, _): &&(String, Type)| {
+                                    f == field_name
+                                })
+                                .unwrap();
+                            let tagged_expression = translate_expression(
+                                type_env,
+                                variable_env,
+                                expr.as_ref().clone().into(),
+                            )?;
+                            unify(
+                                type_.clone(),
+                                tagged_expression.clone().into(),
+                            )?;
+                            Ok((
+                                field_name.clone(),
+                                Box::new(tagged_expression),
+                            ))
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok(TaggedExpression::StructInstantiation(
+                        Box::new(struct_type),
+                        tagged_field_params,
+                    ))
+                } else {
+                    todo!("This is an error but I haven't made it actually useful, sorry!")
+                }
+            } else {
+                unimplemented!("{:?}", struct_type)
+            }
+        }
         Expression::Variable(ident, expr) => {
             let expr_value = translate_expression(
                 type_env,
@@ -687,7 +786,8 @@ fn translate_type_identifier(
 ) -> Result<Type> {
     match ty {
         TypeName::Type(identifier) => {
-            Ok(type_env.get(&identifier).unwrap().get_rox_type())
+            dbg!(identifier.clone());
+            Ok(type_env.get(&dbg!(identifier)).unwrap().get_type())
         }
         TypeName::GenericType(identifier, generic_types) => {
             match type_env.get(&identifier).unwrap() {
@@ -725,12 +825,18 @@ fn translate_type_identifier(
 }
 
 pub(crate) fn analyse_program(
-    declarations: Vec<Declaration>,
-) -> Result<Vec<TaggedDeclaration>> {
+    statements: Vec<Box<Statement>>,
+) -> Result<Vec<TaggedStatement>> {
     let (mut type_env, mut variable_env, _) = builtins::get_builtin_types();
-    declarations
+    statements
         .iter()
-        .map(|d| translate_declaration(&mut type_env, &mut variable_env, d))
+        .map(|s| {
+            translate_statement(
+                &mut type_env,
+                &mut variable_env,
+                s.as_ref().clone(),
+            )
+        })
         .collect()
 }
 

@@ -1,15 +1,11 @@
-use crate::roxc::{Block, Declaration, Expression, Identifier, Operation, Param, TypeName, Statement, Unary};
+use crate::roxc::{Block, Expression, Identifier, Operation, Param, TypeName, Statement, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
 
-pub Program: Vec<Declaration> = {
-    <(<TopLevelFunctionDeclaration>)*>
-}
-
-TopLevelFunctionDeclaration: Declaration = {
-    <Function> => Declaration::Function(<>),
+pub Program: Vec<Box<Statement>> = {
+    <(<Statement>)*>
 }
 
 Function: Box<Statement> = {
@@ -17,21 +13,24 @@ Function: Box<Statement> = {
     "extern" "fn" <Identifier> "(" <Comma<Type>> ")" <("->" <Type>)?> ";" => Box::new(Statement::ExternFunctionDeclaration(<>))
 }
 
+StructDeclaration: Box<Statement> = {
+    "struct" <Identifier> <("<" <Comma<Identifier>> ">")?> "{" <Comma<Param>> "}" => Box::new(Statement::StructDeclaration(<>))
+}
+
 Block: Block = {
-    "{" <(<Statement>)*> "}",
+    "do" <(<Statement>)*> "end",
 }
 
 Statement: Box<Statement> = {
     <Expression> ";" => Box::new(Statement::Expression(<>)),
     <ReturnStatement>,
-    <Function> ";",
+    <Function>,
+    <StructDeclaration>,
     "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
-    <Block> ";" => Box::new(Statement::Block(<>)),
 }
 
 ReturnStatement: Box<Statement> = {
-    "return" <Expression> ";" => Box::new(Statement::Return(Some(<>))),
-    "return" ";" => Box::new(Statement::Return(None)),
+    "return" <(Expression)?> ";" => Box::new(Statement::Return(<>)),
 }
 
 Expression: Box<Expression> = {
@@ -43,6 +42,7 @@ Assignment: Box<Expression> = {
     // i.e. `some_call().attribute = 3;`
     <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
     "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
+    <Identifier><("::" "<" <Comma<Type>> ">")?> "{" <Comma<(<Identifier> ":" <Expression>)>> "}" => Box::new(Expression::StructInstantiation(<>)),
     LogicOr
 }
 
@@ -85,7 +85,7 @@ Unary: Box<Expression> = {
 };
 
 Call: Box<Expression> = {
-    <i: Identifier> <generics:( "::" "<" <Comma<Identifier>> ">")?> "(" <args: (Arguments)?> ")" =>
+    <i: Identifier> <generics:( "::" "<" <Comma<Type>> ">")?> "(" <args: (Arguments)?> ")" =>
         Box::new(Expression::FunctionCall(i, generics.unwrap_or(Vec::new()), args.unwrap_or(Vec::new()))),
     Access,
     Primary
@@ -115,7 +115,7 @@ Params: Vec<Param> = {
 }
 
 Param: Param = {
-    <i:Identifier> ":" <t:Type> => (i, t.as_ref().clone())
+    <i:Identifier> ":" <t:Type> => (i, t)
 }
 
 Arguments: Vec<Box<Expression>> = {

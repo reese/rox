@@ -19,7 +19,7 @@ mod roxc;
 pub use crate::roxc::Result;
 use crate::roxc::{
     init_object_module, init_simplejit_module, parse_file, parse_string,
-    Compiler, Declaration, RoxError,
+    Compiler, RoxError, Statement,
 };
 use codespan_reporting::files::SimpleFile;
 use core::mem;
@@ -85,7 +85,7 @@ pub fn execute_source_string(source: &str) -> Result<isize> {
     execute_declarations(declarations)
 }
 
-fn execute_declarations(declarations: Vec<Declaration>) -> Result<isize> {
+fn execute_declarations(declarations: Vec<Box<Statement>>) -> Result<isize> {
     let mut compiler = Compiler::new(init_simplejit_module());
     let compile_result = compiler.compile(declarations);
     if compile_result.is_err() {

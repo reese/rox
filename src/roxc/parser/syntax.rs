@@ -10,12 +10,17 @@ pub enum Expression {
     Array(Vec<Box<Expression>>),
     Assignment(Box<Expression>, Box<Expression>),
     Boolean(bool),
-    FunctionCall(Identifier, Vec<Identifier>, Vec<Box<Expression>>),
+    FunctionCall(Identifier, Vec<Box<TypeName>>, Vec<Box<Expression>>),
     Identifier(Identifier),
     Number(f64),
     Operation(Box<Expression>, Operation, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     String(String),
+    StructInstantiation(
+        Identifier,
+        Option<Vec<Box<TypeName>>>,
+        Vec<(Identifier, Box<Expression>)>,
+    ),
     Unary(Unary, Box<Expression>),
     Variable(Identifier, Box<Expression>),
     ParseError,
@@ -29,7 +34,7 @@ pub enum TypeName {
 }
 
 pub type Block = Vec<Box<Statement>>;
-pub type Param = (Identifier, TypeName);
+pub type Param = (Identifier, Box<TypeName>);
 pub type Identifier = String;
 
 #[derive(Clone, Debug)]
@@ -95,7 +100,6 @@ pub struct FunctionDeclaration {
 pub enum Statement {
     Expression(Box<Expression>),
     Return(Option<Box<Expression>>),
-    Block(Block),
     IfElse(Box<Expression>, Block, Option<Block>),
     ExternFunctionDeclaration(
         Identifier,
@@ -109,15 +113,5 @@ pub enum Statement {
         Option<Box<TypeName>>,
         Block,
     ),
-}
-
-#[derive(Clone, Debug)]
-/// Declarations are top-level statements that define a function or data type.
-/// As of now, declarations cannot happen inside other declarations, i.e.
-/// you cannot define a function inside of a function.
-/// This should be changed in future versions of Rox.
-pub enum Declaration {
-    // TODO: Allow user defined types
-    // Record(Vec<Field>),
-    Function(Box<Statement>),
+    StructDeclaration(Identifier, Option<Vec<Identifier>>, Vec<Param>),
 }

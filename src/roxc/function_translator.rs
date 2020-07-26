@@ -60,6 +60,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
     fn translate_statement(&mut self, statement: &TaggedStatement) {
         match statement.borrow() {
+            TaggedStatement::StructDeclaration => {},
             TaggedStatement::Expression(expression) => {
                 self.translate_expression(expression);
             }
@@ -98,7 +99,6 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 self.builder.switch_to_block(merge_block);
                 self.builder.seal_block(merge_block);
             }
-            _ => unimplemented!()
         }
     }
 
@@ -241,7 +241,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
 
                 vec![self.builder.ins().global_value(pointer_type, value)]
             }
-            TaggedExpression::Variable(name, expression, _) => {
+            TaggedExpression::Variable(name, expression, type_) => {
                 let value = self.translate_expression(expression)[0];
                 let variable_env = self.variables.top_mut();
                 let variable =
@@ -249,7 +249,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 variable_env.insert(name.clone(), variable);
                 self.builder.declare_var(
                     variable,
-                    self.get_expression_type(expression),
+                    get_cranelift_type(type_, self.pointer_type()),
                 );
                 self.builder.def_var(variable, value);
                 vec![value]
@@ -286,6 +286,10 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 };
                 vec![result]
             }
+            TaggedExpression::StructInstantiation(struct_type, fields) => {
+
+                Vec::new()
+            }
             x => unimplemented!("{:?}", x),
         }
     }
@@ -307,16 +311,6 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             );
             self.builder.def_var(variable, *param);
         });
-    }
-
-    fn get_expression_type(
-        &self,
-        tagged_expression: &TaggedExpression,
-    ) -> Type {
-        get_cranelift_type(
-            &(tagged_expression.clone().into()),
-            self.pointer_type(),
-        )
     }
 
     /// Note that reading a string into bytes with `string.into_bytes()`
