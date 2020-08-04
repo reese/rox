@@ -74,9 +74,9 @@ pub fn run_file(path: PathBuf) -> Result<isize> {
 /// use rox::execute_source_string;
 /// let source = r#"
 /// extern fn puts(String);
-/// fn main() {
+/// fn main() do
 ///     puts("Hello, world!");
-/// }
+/// end
 /// "#;
 /// execute_source_string(source).unwrap();
 /// ```

@@ -27,7 +27,7 @@ impl TypeConstructor {
     pub fn get_record_fields(&self) -> Vec<(Identifier, Type)> {
         match self {
             TypeConstructor::Record(fields) => fields.clone(),
-            _ => panic!("Tried to get records for non-record type") // TODO: improve error handling
+            _ => panic!("Tried to get records for non-record type"), // TODO: improve error handling
         }
     }
 }
@@ -39,4 +39,13 @@ pub enum Type {
     /// (0) is the list of formal arguments,
     /// and (1) is the rest of the type declaration
     PolymorphicType(Vec<Identifier>, Box<Type>),
+}
+
+impl Type {
+    pub fn get_record_fields(&self) -> Vec<(Identifier, Type)> {
+        match self {
+            Type::Apply(constructor, _) => constructor.get_record_fields(),
+            _ => panic!("Tried to get record fields for non-record type"), // TODO: improve error handling
+        }
+    }
 }

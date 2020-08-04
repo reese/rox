@@ -63,8 +63,8 @@ pub fn get_cranelift_type(
     pointer_type: types::Type,
 ) -> types::Type {
     match type_ {
-        Type::Variable(_) => {
-            panic!("Cannot get cranelift type for type variable")
+        Type::Variable(x) => {
+            panic!("Cannot get cranelift type for type variable: {:?}", x)
         }
         Type::Apply(constructor, types) => {
             use TypeConstructor::*;

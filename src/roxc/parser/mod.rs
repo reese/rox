@@ -38,13 +38,13 @@ mod tests {
     #[test]
     fn it_parses_functions_with_no_arguments() {
         let source = r#"
-        fn some_test() -> String {
+        fn some_test() -> String do
             return "Hello, world!";
-        }
+        end
 
-        fn main() {
+        fn main() do
             puts(some_test());
-        }
+        end
         "#;
 
         assert!(parse_string(source).is_ok());
@@ -53,13 +53,13 @@ mod tests {
     #[test]
     fn it_parses_functions_with_arguments() {
         let source = r#"
-        fn some_test(some_string: String) -> String {
+        fn some_test(some_string: String) -> String do
             return some_string;
-        }
+        end
 
-        fn main() {
+        fn main() do
             puts(some_test("Golly this is an amazing test case!"));
-        }
+        end
         "#;
 
         assert!(parse_string(source).is_ok());
@@ -68,17 +68,16 @@ mod tests {
     #[test]
     fn it_parses_type_declaration_with_fields() {
         let source = r#"
-        struct TestStruct = {
+        struct TestStruct {
             first_field: String,
             is_real?: Bool,
-            nested_struct: Option<TestStruct>
         }
 
-        struct AnotherOne<T> = { generic_field: T, not_generic: String, }
+        struct AnotherOne<T> { generic_field: T, not_generic: String, }
 
-        fn main() {
-            let foo = TestStruct { first_field: "", is_real?: true, nested_struct: Option::None };
-        }
+        fn main() do
+            let foo = TestStruct { first_field: "", is_real?: true };
+        end
         "#;
 
         assert!(parse_string(source).is_ok());
