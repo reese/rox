@@ -242,7 +242,8 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 vec![self.builder.ins().global_value(pointer_type, value)]
             }
             TaggedExpression::Variable(name, expression, type_) => {
-                let value = self.translate_expression(expression)[0];
+                let value =
+                    dbg!(self.translate_expression(dbg!(expression)))[0];
                 let variable_env = self.variables.top_mut();
                 let variable =
                     cranelift::prelude::Variable::new(variable_env.len());
@@ -287,8 +288,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 vec![result]
             }
             TaggedExpression::StructInstantiation(struct_type, fields) => {
-
-                Vec::new()
+                todo!()
             }
             x => unimplemented!("{:?}", x),
         }

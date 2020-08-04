@@ -22,7 +22,6 @@ fn it_compiles_functions() {
     end
     "#,
     );
-    dbg!(result.clone());
     assert!(result.is_ok());
 }
 

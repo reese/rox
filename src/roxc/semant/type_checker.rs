@@ -304,9 +304,12 @@ fn translate_statement(
                 .map(|(_, t)| t.clone())
                 .collect::<Vec<_>>();
 
-            let new_type = Type::Apply(
-                TypeConstructor::Record(translated_fields),
-                field_types,
+            let new_type = Type::PolymorphicType(
+                maybe_formal_arguments.unwrap_or_else(Vec::new),
+                Box::new(Type::Apply(
+                    TypeConstructor::Record(translated_fields),
+                    field_types,
+                )),
             );
 
             type_env
@@ -680,14 +683,12 @@ fn translate_expression(
                 Expression::Identifier(identifier.clone()),
             )?;
 
-            let struct_type =
-                dbg!(type_env.get(&identifier).unwrap().get_type());
+            let struct_type = type_env.get(&identifier).unwrap().get_type();
 
-            if let Type::Apply(record_type_constructor, generics) =
-                dbg!(expand(tagged_struct_identifier.clone().into()))
+            if let Type::PolymorphicType(generics, record_type_constructor) =
+                expand(tagged_struct_identifier.clone().into())
             {
-                let fields =
-                    record_type_constructor.as_ref().get_record_fields();
+                let fields = record_type_constructor.get_record_fields();
                 let mut all_types: TypeEnv = type_env
                     .iter_mut()
                     .map(|(n, t)| (n.clone(), t.clone()))
@@ -706,40 +707,42 @@ fn translate_expression(
                             .insert(ident, TypeValue::Type(type_.get_type()));
                     });
 
-                if let Type::Apply(constructor, types) =
-                    *record_type_constructor
-                {
-                    let tagged_field_params = fields
-                        .iter()
-                        .map(|(field_name, type_)| {
-                            let (_, expr) = field_params
-                                .iter()
-                                .find(|(f, _): &&(String, Box<Expression>)| {
-                                    f == field_name
-                                })
-                                .unwrap();
-                            let tagged_expression = translate_expression(
-                                type_env,
-                                variable_env,
-                                expr.as_ref().clone().into(),
-                            )?;
-                            unify(
-                                tagged_expression.clone().into(),
-                                substitute(type_.clone(), &mut all_types),
-                            )?;
-                            Ok((
-                                field_name.clone(),
-                                Box::new(tagged_expression),
-                            ))
-                        })
-                        .collect::<Result<Vec<_>>>()?;
-                    Ok(TaggedExpression::StructInstantiation(
-                        Box::new(struct_type),
-                        tagged_field_params,
-                    ))
-                } else {
-                    unimplemented!("This is an error but I haven't made it actually useful, sorry!")
-                }
+                let tagged_field_params = fields
+                    .iter()
+                    .map(|(field_name, type_)| {
+                        let (_, expr) = field_params
+                            .iter()
+                            .find(|(f, _): &&(String, Box<Expression>)| {
+                                f == field_name
+                            })
+                            .unwrap();
+                        let tagged_expression = translate_expression(
+                            type_env,
+                            variable_env,
+                            expr.as_ref().clone().into(),
+                        )?;
+                        unify(
+                            tagged_expression.clone().into(),
+                            substitute(type_.clone(), &mut all_types),
+                        )?;
+                        Ok((field_name.clone(), Box::new(tagged_expression)))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+
+                let type_fields = tagged_field_params
+                    .iter()
+                    .map(|(name, expression)| {
+                        (name.clone(), expression.as_ref().clone().into())
+                    })
+                    .collect::<Vec<(String, Type)>>();
+
+                Ok(TaggedExpression::StructInstantiation(
+                    Box::new(Type::Apply(
+                        TypeConstructor::Record(type_fields),
+                        Vec::new(),
+                    )),
+                    tagged_field_params,
+                ))
             } else {
                 unimplemented!("{:?}", struct_type)
             }
