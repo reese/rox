@@ -4,6 +4,8 @@
 ![Build](https://github.com/reese/rox/workflows/Build/badge.svg)
 ![Security audit](https://github.com/reese/rox/workflows/Security%20audit/badge.svg)
 
+## Warning: Rox is still _very_ early in development and will likely change drastically in upcoming releases.
+
 This is the main repository for the Rox programming language.
 
 ## Installation
