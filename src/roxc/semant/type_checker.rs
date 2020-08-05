@@ -307,7 +307,7 @@ fn translate_statement(
 
             type_env
                 .insert(struct_name.clone(), TypeValue::Type(new_type.clone()));
-            variable_env.insert(struct_name.clone(), new_type);
+            variable_env.insert(struct_name, new_type);
 
             Ok(TaggedStatement::StructDeclaration)
         }
@@ -668,7 +668,7 @@ fn translate_expression(
                         })
                         .collect::<Result<Vec<_>>>()
                 })
-                .unwrap_or(Ok(Vec::new()))?;
+                .unwrap_or_else(|| Ok(Vec::new()))?;
 
             let tagged_struct_identifier = translate_expression(
                 type_env,
@@ -679,7 +679,7 @@ fn translate_expression(
             let struct_type = type_env.get(&identifier).unwrap().get_type();
 
             if let Type::PolymorphicType(generics, record_type_constructor) =
-                expand(tagged_struct_identifier.clone().into())
+                expand(tagged_struct_identifier.into())
             {
                 let fields = record_type_constructor.get_record_fields();
                 let mut all_types: TypeEnv = type_env
@@ -712,7 +712,7 @@ fn translate_expression(
                         let tagged_expression = translate_expression(
                             type_env,
                             variable_env,
-                            expr.as_ref().clone().into(),
+                            expr.as_ref().clone(),
                         )?;
                         unify(
                             tagged_expression.clone().into(),

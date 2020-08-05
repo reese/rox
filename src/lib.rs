@@ -1,5 +1,6 @@
 #![deny(missing_docs)]
 #![allow(clippy::needless_doctest_main)]
+#![allow(clippy::vec_box)]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/reese/rox/master/assets/rox-logo-transparent-bg.png"
 )]
