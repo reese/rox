@@ -23,10 +23,7 @@ pub enum TaggedExpression {
     Operation(Box<TaggedExpression>, Operation, Box<TaggedExpression>),
     Or(Box<TaggedExpression>, Box<TaggedExpression>),
     String(String),
-    StructInstantiation(
-        Box<Type>,
-        Vec<(Identifier, Box<TaggedExpression>)>,
-    ),
+    StructInstantiation(Box<Type>, Vec<(Identifier, Box<TaggedExpression>)>),
     Unary(Unary, Box<TaggedExpression>, Box<Type>),
     Variable(Identifier, Box<TaggedExpression>, Box<Type>),
 }

@@ -286,7 +286,7 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
                 };
                 vec![result]
             }
-            TaggedExpression::StructInstantiation(struct_type, fields) => {
+            TaggedExpression::StructInstantiation(_struct_type, _fields) => {
                 todo!()
             }
             x => unimplemented!("{:?}", x),

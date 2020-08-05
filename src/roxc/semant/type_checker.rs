@@ -43,13 +43,6 @@ impl TypeValue {
             }
         }
     }
-
-    fn get_type_constructor(&self) -> TypeConstructor {
-        match self {
-            TypeValue::Type(_) => panic!("Expected type constructor, got type"),
-            TypeValue::Constructor(c) => c.clone(),
-        }
-    }
 }
 
 impl From<&Type> for TypeValue {
