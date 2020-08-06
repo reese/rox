@@ -268,16 +268,14 @@ fn translate_statement(
             fields,
         ) => {
             let mut local_type_env = type_env.clone();
-            maybe_formal_arguments
-                .iter()
-                .for_each(|generic_types| {
-                    generic_types.iter().for_each(|t| {
-                        local_type_env.insert(
-                            t.clone(),
-                            TypeValue::Type(Type::Variable(t.clone())),
-                        );
-                    });
+            maybe_formal_arguments.iter().for_each(|generic_types| {
+                generic_types.iter().for_each(|t| {
+                    local_type_env.insert(
+                        t.clone(),
+                        TypeValue::Type(Type::Variable(t.clone())),
+                    );
                 });
+            });
 
             let translated_fields = fields
                 .iter()
@@ -291,7 +289,6 @@ fn translate_statement(
                 .collect::<Result<Vec<_>>>()?;
 
             let field_types = translated_fields
-                .clone()
                 .iter()
                 .map(|(_, t)| t.clone())
                 .collect::<Vec<_>>();
