@@ -269,7 +269,6 @@ fn translate_statement(
         ) => {
             let mut local_type_env = type_env.clone();
             maybe_formal_arguments
-                .clone()
                 .iter()
                 .for_each(|generic_types| {
                     generic_types.iter().for_each(|t| {
