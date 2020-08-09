@@ -1,7 +1,7 @@
 use crate::roxc::{create_entry_block_allocation, semant};
 use crate::roxc::{
-    get_cranelift_type, parser, FunctionDeclaration, Identifier, Result, Stack,
-    TaggedExpression, TaggedStatement,
+    parser, FunctionDeclaration, Identifier, Result, Stack, TaggedExpression,
+    TaggedStatement,
 };
 use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;

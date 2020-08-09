@@ -1,7 +1,7 @@
 use crate::roxc::{
-    analyse_program, get_builtin_types, get_cranelift_type,
-    FunctionDeclaration, FunctionTranslator, Identifier, Param, Result,
-    RoxError, Stack, Statement, TaggedStatement, Type,
+    analyse_program, get_builtin_types, FunctionDeclaration,
+    FunctionTranslator, Identifier, Param, Result, RoxError, Stack, Statement,
+    TaggedStatement, Type,
 };
 use inkwell::builder::Builder;
 use inkwell::context::Context;

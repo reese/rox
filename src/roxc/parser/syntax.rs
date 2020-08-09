@@ -1,7 +1,6 @@
 #![allow(clippy::vec_box)]
 use crate::roxc::semant;
 use crate::roxc::{Type, TypeConstructor};
-use cranelift::prelude::types;
 
 #[derive(Clone, Debug)]
 pub enum Expression {
@@ -56,37 +55,6 @@ pub enum Operation {
 pub enum Unary {
     Not,
     Negate,
-}
-
-pub fn get_cranelift_type(
-    type_: &semant::Type,
-    pointer_type: types::Type,
-) -> types::Type {
-    match type_ {
-        Type::Variable(x) => {
-            panic!("Cannot get cranelift type for type variable: {:?}", x)
-        }
-        Type::Apply(constructor, types) => {
-            use TypeConstructor::*;
-            match constructor {
-                Bool => types::B1,
-                Number => types::F64,
-                String => pointer_type,
-                Void => types::INVALID,
-                Arrow => get_cranelift_type(
-                    types.iter().last().unwrap(),
-                    pointer_type,
-                ),
-                Array => pointer_type,
-                Record(_) => unimplemented!("Implement record type"),
-                FunctionType(_, _) => pointer_type,
-                Unique(_) => unimplemented!("Implement unique type"),
-            }
-        }
-        Type::PolymorphicType(_, _type_) => {
-            unimplemented!("Implement polymorphic type")
-        }
-    }
 }
 
 #[derive(Clone, Debug)]

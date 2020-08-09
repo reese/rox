@@ -21,7 +21,6 @@ use crate::roxc::{
 };
 use codespan_reporting::files::SimpleFile;
 use core::mem;
-use cranelift_module::FuncOrDataId;
 use std::env::temp_dir;
 use std::ffi::OsString;
 use std::fs::File;
@@ -84,23 +83,24 @@ pub fn execute_source_string(source: &str) -> Result<isize> {
 }
 
 fn execute_declarations(declarations: Vec<Box<Statement>>) -> Result<isize> {
-    let mut compiler = Compiler::new(init_simplejit_module());
+    let mut compiler = Compiler::new();
     let compile_result = compiler.compile(declarations);
     if compile_result.is_err() {
         return Err(compile_result.err().unwrap());
     }
     let Compiler { mut module, .. } = compiler;
-    let func_id = module.get_name("main").unwrap();
-    // TODO: Handle `argc` and `argv` in `main`
-    // TODO: Could this unsafe block be pushed into `SimpleJITBackend`?
-    match func_id {
-        FuncOrDataId::Func(func) => Ok(unsafe {
-            mem::transmute::<_, fn() -> isize>(
-                module.get_finalized_function(func),
-            )()
-        }),
-        _ => unreachable!(),
-    }
+    Ok(1)
+    // let func_id = module.get_name("main").unwrap();
+    // // TODO: Handle `argc` and `argv` in `main`
+    // // TODO: Could this unsafe block be pushed into `SimpleJITBackend`?
+    // match func_id {
+    //     FuncOrDataId::Func(func) => Ok(unsafe {
+    //         mem::transmute::<_, fn() -> isize>(
+    //             module.get_finalized_function(func),
+    //         )()
+    //     }),
+    //     _ => unreachable!(),
+    // }
 }
 
 /// This function generates the native object file
