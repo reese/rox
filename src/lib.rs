@@ -8,9 +8,6 @@
     html_favicon_url = "https://raw.githubusercontent.com/reese/rox/master/assets/favicon.ico"
 )]
 //! # Rox
-//! `Rox` is high-level, statically-typed, compiled language that mixes
-//! the familiarity of C-style syntax with the rigorous and expressive features
-//! of functional languages.
 
 #[macro_use]
 extern crate lalrpop_util;

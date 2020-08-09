@@ -1,55 +1,50 @@
-use crate::roxc::semant;
+use crate::roxc::{create_entry_block_allocation, semant};
 use crate::roxc::{
-    get_cranelift_type, parser, FunctionDeclaration, Identifier, Stack,
+    get_cranelift_type, parser, FunctionDeclaration, Identifier, Result, Stack,
     TaggedExpression, TaggedStatement,
 };
-use cranelift::prelude::*;
-use cranelift_module::{Backend, DataContext, Linkage, Module, ModuleError};
+use inkwell::basic_block::BasicBlock;
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::module::Module;
+use inkwell::types::{ArrayType, VectorType, VoidType};
+use inkwell::values::{
+    BasicValue, BasicValueEnum, FloatValue, FunctionValue, PointerValue,
+};
+use inkwell::FloatPredicate;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
-pub struct FunctionTranslator<'func, T: Backend> {
-    builder: &'func mut FunctionBuilder<'func>,
-    data_context: &'func mut DataContext,
-    pub variables: &'func mut Stack<HashMap<Identifier, Variable>>,
+pub struct FunctionTranslator<'func> {
+    builder: &'func mut Builder<'func>,
+    context: &'func mut Context,
+    function: &'func mut FunctionValue<'func>,
+    pub variables: &'func mut Stack<HashMap<Identifier, PointerValue<'func>>>,
     pub functions: &'func mut Stack<HashMap<Identifier, FunctionDeclaration>>,
-    pub module: &'func mut Module<T>,
+    pub module: &'func mut Module<'func>,
 }
 
-impl<'func, T: Backend> FunctionTranslator<'func, T> {
+impl<'func> FunctionTranslator<'func> {
     pub fn new(
-        builder: &'func mut FunctionBuilder<'func>,
-        data_context: &'func mut DataContext,
-        variables: &'func mut Stack<HashMap<Identifier, Variable>>,
+        builder: &'func mut Builder<'func>,
+        context: &'func mut Context,
+        function: &'func mut FunctionValue<'func>,
+        variables: &'func mut Stack<HashMap<Identifier, PointerValue<'func>>>,
         functions: &'func mut Stack<HashMap<Identifier, FunctionDeclaration>>,
-        module: &'func mut Module<T>,
+        module: &'func mut Module<'func>,
     ) -> Self {
         FunctionTranslator {
             builder,
-            data_context,
+            context,
+            function,
             variables,
             functions,
             module,
         }
     }
 
-    pub(crate) fn translate_function(
-        &mut self,
-        params: &[(Identifier, semant::Type)],
-        block: &[TaggedStatement],
-    ) {
-        self.initialize_block(params);
+    pub(crate) fn translate_function(&mut self, block: &[TaggedStatement]) {
         self.translate_block(block);
-
-        // Add return if block doesn't have a return statement
-        if !block.iter().any(|statement| match *statement {
-            TaggedStatement::Return(_) => true,
-            _ => false,
-        }) {
-            self.builder.ins().return_(&[]);
-        }
-
-        self.builder.finalize();
     }
 
     fn translate_block(&mut self, block: &[TaggedStatement]) {
@@ -77,214 +72,152 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
             },
             TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
-                    let returns = self.translate_expression(expression);
-                    self.builder.ins().return_(&returns);
+                    let return_ = self.translate_expression(expression);
+                    self.builder.build_return(Some(&return_));
                 } else {
-                    self.builder.ins().return_(&[]);
+                    self.builder.build_return(None);
                 }
             }
             TaggedStatement::IfElse(conditional, if_statements, else_statements_maybe) => {
-                let if_block = self.builder.create_block();
-                let else_block = self.builder.create_block();
-                let merge_block = self.builder.create_block();
+                let if_block = self.context.append_basic_block(*self.function, "if");
+                let else_block = self.context.append_basic_block(*self.function, "else");
+                let merge_block = self.context.append_basic_block(*self.function, "continue");
 
-                let conditional_value = self.translate_expression(conditional)[0];
+                let conditional_value = self.translate_expression(conditional).into_float_value();
+                let zero_const = self.context.f64_type().const_zero();
+                let conditional_value = self.builder.build_float_compare(FloatPredicate::ONE, conditional_value, zero_const, "ifcond");
 
-                self.builder.ins().brz(conditional_value, else_block, &[]);
-                self.builder.ins().jump(if_block, &[]);
+                self.builder.build_conditional_branch(conditional_value, if_block, else_block);
 
                 self.read_into_block(Some(if_statements.clone()), if_block, merge_block);
                 self.read_into_block(else_statements_maybe.clone(), else_block, merge_block);
 
-                self.builder.switch_to_block(merge_block);
-                self.builder.seal_block(merge_block);
+                self.builder.position_at_end(merge_block);
+                // N.B. I left out the `phi` value since I don't intend
+                // to return anything from these values, but that may
+                // change in the future
             }
         }
     }
 
-    #[allow(clippy::vec_box)]
     fn read_into_block(
         &mut self,
         maybe_statements: Option<Vec<TaggedStatement>>,
-        conditional_block: Block,
-        merge_block: Block,
-    ) {
-        let mut has_return = false;
-        self.builder.switch_to_block(conditional_block);
-        self.builder.seal_block(conditional_block);
-        if let Some(if_statements) = maybe_statements {
-            if_statements.iter().for_each(|statement| {
-                if let TaggedStatement::Return(_) = statement {
-                    has_return = true;
-                }
-                self.translate_statement(statement);
-            });
+        conditional_block: BasicBlock,
+        merge_block: BasicBlock,
+    ) -> BasicBlock<'func> {
+        self.builder.position_at_end(conditional_block);
+        if let Some(statements) = maybe_statements {
+            self.translate_block(statements.as_slice());
         }
-        if !has_return {
-            self.builder.ins().jump(merge_block, &[]);
-        }
+        self.builder.build_unconditional_branch(merge_block);
+
+        self.builder.get_insert_block().unwrap()
     }
 
     pub fn translate_expression(
         &mut self,
         expression: &TaggedExpression,
-    ) -> Vec<Value> {
+    ) -> BasicValueEnum {
         match expression {
-            TaggedExpression::Boolean(bool) => {
-                vec![self.builder.ins().bconst(types::B1, *bool)]
-            }
+            TaggedExpression::Boolean(bool) => self
+                .context
+                .bool_type()
+                .const_int(*bool as u64, false)
+                .into(),
             TaggedExpression::FunctionCall(function_name, args, _rox_type) => {
-                let FunctionDeclaration {
-                    return_type,
-                    params,
-                    ..
-                } = self.functions.top().get(function_name).unwrap();
+                if let Some(function) = self.module.get_function(function_name)
+                {
+                    let argument_values = args
+                        .iter()
+                        .map(|arg| self.translate_expression(arg).clone())
+                        .collect::<Vec<_>>();
+                    let argument_types = argument_values
+                        .iter()
+                        .by_ref()
+                        .map(|&val| val.into())
+                        .collect::<Vec<_>>();
 
-                let mut signature = self.module.make_signature();
-                params.iter().for_each(|(_, type_name)| {
-                    signature.params.push(AbiParam::new(get_cranelift_type(
-                        type_name,
-                        self.pointer_type(),
-                    )));
-                });
-                let codegen_type =
-                    get_cranelift_type(return_type, self.pointer_type());
-                if codegen_type != types::INVALID {
-                    signature.returns.push(AbiParam::new(codegen_type));
-                }
-
-                let callee = self
-                    .module
-                    .declare_function(
-                        function_name.clone().as_str(),
-                        Linkage::Import,
-                        &signature,
-                    )
-                    .unwrap();
-                let local_callee = self
-                    .module
-                    .declare_func_in_func(callee, &mut self.builder.func);
-
-                let argument_values: Vec<Value> = args
-                    .iter()
-                    .map(|arg| *self.translate_expression(arg).get(0).unwrap())
-                    .collect();
-                let call =
-                    self.builder.ins().call(local_callee, &argument_values);
-                let returns = self.builder.inst_results(call); // TODO: Support multiple returns
-                if !returns.is_empty() {
-                    vec![returns[0]]
+                    match self
+                        .builder
+                        .build_call(function, argument_types.as_slice(), "tmp")
+                        .try_as_basic_value()
+                        .left()
+                    {
+                        Some(value) => value.into(),
+                        None => todo!("Handle returning void"),
+                    }
                 } else {
-                    returns.to_vec()
+                    panic!("Attempted to build a function not in this module.")
                 }
             }
-
             TaggedExpression::Number(num) => {
-                vec![self.builder.ins().f64const(*num)]
+                self.context.f64_type().const_float(*num).into()
             }
-            TaggedExpression::Array(tagged_expressions, _type_) => {
-                self.data_context.define_zeroinit(
-                    (get_cranelift_type(
-                        &tagged_expressions.first().unwrap().clone().into(),
-                        self.pointer_type(),
-                    )
-                    .bytes()
-                        * (tagged_expressions.len() as u32))
-                        as usize,
-                );
-                let data_id = self
-                    .module
-                    .declare_data(
-                        format!("{:?}", tagged_expressions).as_ref(), // TODO: Surely there's a better way to do this?
-                        Linkage::Export,
-                        true,
-                        false,
-                        None,
-                    )
-                    .unwrap();
-                self.module
-                    .define_data(data_id, &self.data_context)
-                    .unwrap();
-                let value = self
-                    .module
-                    .declare_data_in_func(data_id, self.builder.func);
-                self.data_context.clear();
-                self.module.finalize_definitions();
-                let pointer_type = self.pointer_type();
-                vec![self.builder.ins().global_value(pointer_type, value)]
+            // TODO: We should consider renaming Array to Vector (for all types), since it's not technically an array
+            TaggedExpression::Array(tagged_expressions, type_) => {
+                let expression_values = tagged_expressions
+                    .iter()
+                    .map(|e| self.translate_expression(t))
+                    .collect::<Vec<_>>();
+                VectorType::const_vector(expression_values.as_slice()).into()
             }
             TaggedExpression::String(string) => {
-                self.define_null_terminated_string(string);
-                let id = self
-                    .module
-                    .declare_data(
-                        string.as_ref(),
-                        Linkage::Export,
-                        false,
-                        false,
-                        None,
-                    )
-                    .unwrap();
-                match self.module.define_data(id, &self.data_context) {
-                    Ok(_) => Ok(()),
-                    Err(error) => match error {
-                        ModuleError::DuplicateDefinition(_) => Ok(()),
-                        err => Err(err),
-                    },
-                }
-                .expect("Could not define string in module");
-                let value =
-                    self.module.declare_data_in_func(id, self.builder.func);
-                self.data_context.clear();
-                self.module.finalize_definitions();
-                let pointer_type = self.pointer_type();
-
-                vec![self.builder.ins().global_value(pointer_type, value)]
+                self.context.const_string(string.as_bytes(), false).into()
             }
             TaggedExpression::Variable(name, expression, type_) => {
-                let value = self.translate_expression(expression)[0];
-                let variable_env = self.variables.top_mut();
-                let variable =
-                    cranelift::prelude::Variable::new(variable_env.len());
-                variable_env.insert(name.clone(), variable);
-                self.builder.declare_var(
-                    variable,
-                    get_cranelift_type(type_, self.pointer_type()),
+                let value = self.translate_expression(expression);
+                let allocation = create_entry_block_allocation(
+                    self.builder,
+                    name,
+                    self.function,
+                    value.get_type(),
                 );
-                self.builder.def_var(variable, value);
-                vec![value]
+                self.builder.build_store(allocation, value);
+                let variable_env = self.variables.top_mut();
+                variable_env.insert(name.clone(), value.into_pointer_value());
+                value
             }
             TaggedExpression::Identifier(name, _rox_type) => {
                 let variables = self.variables.top();
                 let variable =
                     variables.get(name).expect("Variable not defined");
-                vec![self.builder.use_var(*variable)]
+                self.builder.build_load(*variable, name.as_str())
             }
             TaggedExpression::Operation(left, operation, right) => {
                 use parser::Operation::*;
-                let lval = self.translate_expression(left)[0];
-                let rval = self.translate_expression(right)[0];
-                let result = match operation {
-                    Add => self.builder.ins().fadd(lval, rval),
-                    Subtract => self.builder.ins().fsub(lval, rval),
-                    Multiply => self.builder.ins().fmul(lval, rval),
-                    Divide => self.builder.ins().fdiv(lval, rval),
+                let lval = self.translate_expression(left).into_float_value();
+                let rval = self.translate_expression(right).into_float_value();
+                match operation {
+                    Add => self
+                        .builder
+                        .build_float_add(lval, rval, "tmpadd")
+                        .into(),
+                    Subtract => self
+                        .builder
+                        .build_float_sub(lval, rval, "tmpsub")
+                        .into(),
+                    Multiply => self
+                        .builder
+                        .build_float_mul(lval, rval, "tmpmul")
+                        .into(),
+                    Divide => self
+                        .builder
+                        .build_float_div(lval, rval, "tmpdiv")
+                        .into(),
                     Equals => {
-                        self.builder.ins().fcmp(FloatCC::Equal, lval, rval)
+                        self.binary_comparison(FloatPredicate::OEQ, lval, rval)
                     }
                     NotEquals => {
-                        self.builder.ins().fcmp(FloatCC::NotEqual, lval, rval)
+                        self.binary_comparison(FloatPredicate::ONE, lval, rval)
                     }
-                    GreaterThan => self.builder.ins().fcmp(
-                        FloatCC::GreaterThan,
-                        lval,
-                        rval,
-                    ),
+                    GreaterThan => {
+                        self.binary_comparison(FloatPredicate::OGT, lval, rval)
+                    }
                     LessThan => {
-                        self.builder.ins().fcmp(FloatCC::LessThan, lval, rval)
+                        self.binary_comparison(FloatPredicate::OLT, lval, rval)
                     }
-                };
-                vec![result]
+                }
             }
             TaggedExpression::StructInstantiation(_struct_type, _fields) => {
                 todo!()
@@ -293,38 +226,24 @@ impl<'func, T: Backend> FunctionTranslator<'func, T> {
         }
     }
 
-    fn initialize_block(&mut self, params: &[(Identifier, semant::Type)]) {
-        let entry_block = self.builder.create_block();
+    fn binary_comparison(
+        &self,
+        predicate: FloatPredicate,
+        lval: FloatValue,
+        rval: FloatValue,
+    ) -> BasicValueEnum {
+        let comparison = self.builder.build_float_compare(
+            predicate,
+            lval.clone(),
+            rval.clone(),
+            "tmpcmp",
+        );
         self.builder
-            .append_block_params_for_function_params(entry_block);
-        self.builder.switch_to_block(entry_block);
-        self.builder.seal_block(entry_block);
-        let block_params = self.builder.block_params(entry_block).to_vec();
-        block_params.iter().enumerate().for_each(|(index, param)| {
-            let (name, type_) = params.get(index).unwrap().clone();
-            let variable = Variable::new(index);
-            self.variables.top_mut().insert(name, variable);
-            self.builder.declare_var(
-                variable,
-                get_cranelift_type(&type_, self.pointer_type()),
-            );
-            self.builder.def_var(variable, *param);
-        });
-    }
-
-    /// Note that reading a string into bytes with `string.into_bytes()`
-    /// does _not_ include the null terminator. If we don't add it
-    /// here, multiple strings co-located in the same function
-    /// will read together as one giant string since we
-    /// store the pointer, not the actual string
-    fn define_null_terminated_string(&mut self, original_string: &str) {
-        let mut null_terminated_string = original_string.to_string();
-        null_terminated_string.push('\0');
-        self.data_context
-            .define(null_terminated_string.into_bytes().into_boxed_slice());
-    }
-
-    fn pointer_type(&self) -> Type {
-        self.module.target_config().pointer_type()
+            .build_unsigned_int_to_float(
+                comparison,
+                self.context.f64_type(),
+                "tmpbool",
+            )
+            .into()
     }
 }

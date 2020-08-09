@@ -1,32 +1,51 @@
 use crate::roxc::{
     analyse_program, get_builtin_types, get_cranelift_type,
-    FunctionDeclaration, FunctionTranslator, Identifier, Result, Stack,
-    Statement, TaggedStatement,
+    FunctionDeclaration, FunctionTranslator, Identifier, Param, Result,
+    RoxError, Stack, Statement, TaggedStatement, Type,
 };
-use cranelift::codegen;
-use cranelift::prelude::*;
-use cranelift_codegen::isa::CallConv;
-use cranelift_module::{Backend, DataContext, Linkage, Module};
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::module::Module;
+use inkwell::passes::PassManager;
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::{
+    BasicValue, BasicValueEnum, FunctionValue, PointerValue,
+};
 use std::collections::HashMap;
 
-pub struct Compiler<T: Backend> {
-    function_builder_context: FunctionBuilderContext,
-    data_context: DataContext,
-    pub(crate) module: Module<T>,
-    environment_stack: Stack<HashMap<Identifier, Variable>>,
+pub struct Compiler<'c> {
+    context: Context,
+    pub(crate) module: Module<'c>,
+    function_pass_manager: PassManager<FunctionValue<'c>>,
+    environment_stack: Stack<HashMap<Identifier, PointerValue<'c>>>,
     function_stack: Stack<HashMap<Identifier, FunctionDeclaration>>,
 }
 
-impl<T: Backend> Compiler<T> {
-    pub fn new(module: Module<T>) -> Self {
+impl<'c> Compiler<'c> {
+    pub fn new() -> Self {
+        let context = Context::create();
+        let module = context.create_module("rox");
         let mut environment_stack = Stack::new();
         environment_stack.push(HashMap::new());
         let (_, _, function_stack) = get_builtin_types();
+        let function_pass_manager = PassManager::create(&module);
+
+        // TODO: Which of these do we actually want?
+        function_pass_manager.add_instruction_combining_pass();
+        function_pass_manager.add_reassociate_pass();
+        function_pass_manager.add_gvn_pass();
+        function_pass_manager.add_cfg_simplification_pass();
+        function_pass_manager.add_basic_alias_analysis_pass();
+        function_pass_manager.add_promote_memory_to_register_pass();
+        function_pass_manager.add_instruction_combining_pass();
+        function_pass_manager.add_reassociate_pass();
+
+        function_pass_manager.initialize();
 
         Compiler {
-            function_builder_context: FunctionBuilderContext::new(),
-            data_context: DataContext::new(),
+            context,
             module,
+            function_pass_manager,
             environment_stack,
             function_stack,
         }
@@ -58,15 +77,16 @@ impl<T: Backend> Compiler<T> {
         &mut self,
         statement: &TaggedStatement,
     ) -> Result<()> {
-        let mut codegen_context = self.module.make_context();
         match statement {
             TaggedStatement::ExternFunctionDeclaration(
                 function_declaration,
             ) => {
-                self.function_stack.top_mut().insert(
+                self.compile_prototype(
                     function_declaration.name.clone(),
-                    function_declaration.clone(),
+                    &function_declaration.params,
+                    &function_declaration.return_type,
                 );
+                Ok(())
             }
             TaggedStatement::FunctionDeclaration(func_declaration, block) => {
                 let FunctionDeclaration {
@@ -74,74 +94,103 @@ impl<T: Backend> Compiler<T> {
                     params,
                     return_type,
                 } = func_declaration;
-                let mut signature = Signature::new(CallConv::SystemV);
-                params.iter().for_each(|(_, type_str)| {
-                    let codegen_type = get_cranelift_type(
-                        type_str,
-                        self.module.target_config().pointer_type(),
-                    );
-                    if codegen_type != types::INVALID {
-                        signature.params.push(AbiParam::new(codegen_type));
-                    }
-                });
-
-                let codegen_type = get_cranelift_type(
+                let mut fn_value = self.compile_prototype(
+                    func_name.clone(),
+                    params,
                     return_type,
-                    self.module.target_config().pointer_type(),
                 );
-                if codegen_type != types::INVALID {
-                    signature.returns.push(AbiParam::new(codegen_type));
-                }
+                let entry = self.context.append_basic_block(fn_value, "entry");
+                let mut builder = self.context.create_builder();
+                builder.position_at_end(entry);
+                self.environment_stack.top_mut().reserve(params.len());
 
-                codegen_context.func.name = func_name.clone().parse().unwrap();
-                codegen_context.func.signature = signature;
-
-                let mut builder = FunctionBuilder::new(
-                    &mut codegen_context.func,
-                    &mut self.function_builder_context,
+                fn_value.get_param_iter().enumerate().for_each(
+                    |(index, arg)| {
+                        let (arg_name, ty) = params[index].clone();
+                        let allocation = create_entry_block_allocation(
+                            &builder,
+                            arg_name.as_ref(),
+                            &mut fn_value,
+                            arg.get_type(),
+                        );
+                        builder.build_store(allocation, arg);
+                        self.environment_stack
+                            .top_mut()
+                            .insert(params[index].0.clone(), allocation);
+                    },
                 );
 
-                let function_declaration = FunctionDeclaration {
-                    name: func_name.clone(),
-                    params: params.clone(),
-                    return_type: return_type.clone(),
-                };
                 self.function_stack
                     .top_mut()
-                    .insert(func_name.clone(), function_declaration);
+                    .insert(func_name.clone(), func_declaration.clone());
 
                 let mut function_translator = FunctionTranslator::new(
                     &mut builder,
-                    &mut self.data_context,
+                    &mut self.context,
+                    &mut fn_value,
                     &mut self.environment_stack,
                     &mut self.function_stack,
                     &mut self.module,
                 );
 
-                function_translator.translate_function(&params, block);
+                function_translator.translate_function(block);
 
-                let func = self
-                    .module
-                    .declare_function(
-                        func_name.clone().as_str(),
-                        Linkage::Export,
-                        &codegen_context.func.signature,
-                    )
-                    .unwrap();
-                self.module
-                    .define_function(
-                        func,
-                        &mut codegen_context,
-                        &mut codegen::binemit::NullTrapSink {},
-                    )
-                    .unwrap();
-                self.module.clear_context(&mut codegen_context);
+                if fn_value.verify(true) {
+                    Ok(())
+                } else {
+                    Err(RoxError::with_file_placeholder(
+                        "Invalid generated function",
+                    ))
+                }
             }
-            TaggedStatement::StructDeclaration => {}
+            TaggedStatement::StructDeclaration => todo!(),
             _ => unreachable!(),
         };
-        self.module.clear_context(&mut codegen_context);
-        self.module.finalize_definitions();
+        self.function_pass_manager.run_on(&self.module);
         Ok(())
     }
+
+    /// Compile the function signature
+    fn compile_prototype(
+        &self,
+        func_name: String,
+        params: &Vec<(Identifier, Type)>,
+        _return_type: &Type,
+    ) -> FunctionValue {
+        let mut param_types = params
+            .iter()
+            .map(|(_, _)| self.context.f64_type().clone().into())
+            .collect::<Vec<_>>();
+        param_types.push(self.context.f64_type().into());
+        let fn_type = self
+            .context
+            .f64_type()
+            .fn_type(param_types.as_slice(), false);
+        let mut fn_value =
+            self.module.add_function(func_name.as_str(), fn_type, None);
+        fn_value
+            .get_param_iter()
+            .enumerate()
+            .for_each(|(index, arg)| {
+                arg.into_float_value()
+                    .set_name(params.get(index).unwrap().0.as_str())
+            });
+        fn_value
+    }
+}
+
+/// Allocate space on stack frame for function arguments
+pub fn create_entry_block_allocation<'f>(
+    builder: &Builder<'f>,
+    name: &str,
+    function: &mut FunctionValue,
+    ty: BasicTypeEnum<'f>,
+) -> PointerValue<'f> {
+    let entry = function.get_first_basic_block().unwrap();
+    if let Some(first_instruction) = entry.get_first_instruction() {
+        builder.position_before(&first_instruction);
+    } else {
+        builder.position_at_end(entry);
+    }
+    builder.build_alloca(ty, name)
 }
