@@ -16,15 +16,16 @@ mod roxc;
 
 pub use crate::roxc::Result;
 use crate::roxc::{
-    init_object_module, init_simplejit_module, parse_file, parse_string,
-    Compiler, RoxError, Statement,
+    get_builtin_types, parse_file, parse_string, Compiler, RoxError, Stack,
+    Statement,
 };
 use codespan_reporting::files::SimpleFile;
-use core::mem;
+use inkwell::context::Context;
+use inkwell::module::Module;
+use inkwell::passes::PassManager;
+use std::collections::HashMap;
 use std::env::temp_dir;
 use std::ffi::OsString;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
@@ -37,33 +38,16 @@ use std::process::{Command, Output};
 /// it would likely be a good idea to refactor these
 /// to have POSIX compliant error codes, or at least
 /// some consistent error code system.
-pub fn build_file(
-    path: PathBuf,
-    output: PathBuf,
-    no_link: bool,
-) -> Result<isize> {
-    build_source_string(output, no_link, path)
+pub fn build_file(path: PathBuf, output: PathBuf) -> Result<isize> {
+    build_source_string(output, path)
 }
 
 /// Builds the given source string and links to the output file
-pub fn build_source_string(
-    output: PathBuf,
-    no_link: bool,
-    source: PathBuf,
-) -> Result<isize> {
-    if no_link {
-        compile_file(source, output)?;
-        Ok(0)
-    } else {
-        compile_and_link(source, output)?;
-        Ok(0)
-    }
-}
-
-/// Run the given file with the SimpleJITBackend
-pub fn run_file(path: PathBuf) -> Result<isize> {
-    let declarations = parse_file(path)?;
-    execute_declarations(declarations)
+pub fn build_source_string(output: PathBuf, source: PathBuf) -> Result<isize> {
+    let context = Context::create();
+    let module = context.create_module("rox");
+    compile_file(source, output, &context, &module)?;
+    Ok(0)
 }
 
 /// Executes the raw source string with the JIT compiler.
@@ -77,58 +61,68 @@ pub fn run_file(path: PathBuf) -> Result<isize> {
 /// "#;
 /// execute_source_string(source).unwrap();
 /// ```
-pub fn execute_source_string(source: &str) -> Result<isize> {
+pub fn execute_source_string(source: &str) -> Result<()> {
     let declarations = parse_string(source)?;
-    execute_declarations(declarations)
+    let context = Context::create();
+    let module = context.create_module("rox");
+    execute_declarations(declarations, &context, &module)?;
+    Ok(())
 }
 
-fn execute_declarations(declarations: Vec<Box<Statement>>) -> Result<isize> {
-    let mut compiler = Compiler::new();
-    let compile_result = compiler.compile(declarations);
-    if compile_result.is_err() {
-        return Err(compile_result.err().unwrap());
-    }
-    let Compiler { mut module, .. } = compiler;
-    Ok(1)
-    // let func_id = module.get_name("main").unwrap();
-    // // TODO: Handle `argc` and `argv` in `main`
-    // // TODO: Could this unsafe block be pushed into `SimpleJITBackend`?
-    // match func_id {
-    //     FuncOrDataId::Func(func) => Ok(unsafe {
-    //         mem::transmute::<_, fn() -> isize>(
-    //             module.get_finalized_function(func),
-    //         )()
-    //     }),
-    //     _ => unreachable!(),
-    // }
+fn execute_declarations<'c>(
+    declarations: Vec<Box<Statement>>,
+    context: &'c Context,
+    module: &'c Module<'c>,
+) -> Result<()> {
+    let mut environment_stack = Stack::new();
+    environment_stack.push(HashMap::new());
+    let (_, _, mut function_stack) = get_builtin_types();
+    let function_pass_manager = PassManager::create(module);
+
+    let mut compiler = Compiler::new(
+        context,
+        module,
+        &function_pass_manager,
+        &mut environment_stack,
+        &mut function_stack,
+    );
+    compiler.compile(declarations)
 }
 
-/// This function generates the native object file
-/// and links it using the machine's default C compiler.
-fn compile_and_link(input_file: PathBuf, output: PathBuf) -> Result<Output> {
-    let temp = create_temp_object_file();
-    match compile_file(input_file, temp.clone()) {
-        Err(err) => Err(err),
-        Ok(_) => link_file(temp, output),
-    }
-}
-
-fn compile_file<T>(input_file: T, object_file_output: T) -> Result<()>
+fn compile_file<'c, T>(
+    input_file: T,
+    object_file_output: T,
+    context: &'c Context,
+    module: &'c Module<'c>,
+) -> Result<()>
 where
     T: Into<PathBuf> + Sized + Clone,
 {
     let declarations = parse_file(input_file)?;
-    let mut compiler = Compiler::new(init_object_module());
+
+    // TODO: Clean this shit up
+    let mut environment_stack = Stack::new();
+    environment_stack.push(HashMap::new());
+    let (_, _, mut function_stack) = get_builtin_types();
+    let function_pass_manager = PassManager::create(module);
+
+    let mut compiler = Compiler::new(
+        &context,
+        &module,
+        &function_pass_manager,
+        &mut environment_stack,
+        &mut function_stack,
+    );
     match compiler.compile(declarations) {
         Err(err) => Err(err),
         Ok(_) => {
-            let product = compiler.finish();
-            let bytes = product.emit().unwrap();
-            File::create(object_file_output.into())
-                .unwrap()
-                .write_all(&bytes)
-                .unwrap();
-            Ok(())
+            let product = compiler.finish(object_file_output);
+            match product {
+                false => Err(RoxError::with_file_placeholder(
+                    "Something bad happened",
+                )),
+                true => Ok(()),
+            }
         }
     }
 }

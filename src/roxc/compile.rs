@@ -1,35 +1,37 @@
+use crate::roxc::compiler_state::CompilerState;
 use crate::roxc::{
-    analyse_program, get_builtin_types, FunctionDeclaration,
-    FunctionTranslator, Identifier, Param, Result, RoxError, Stack, Statement,
-    TaggedStatement, Type,
+    analyse_program, FunctionDeclaration, FunctionTranslator, Identifier,
+    Result, RoxError, Stack, Statement, TaggedStatement, Type,
 };
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
-use inkwell::types::BasicTypeEnum;
-use inkwell::values::{
-    BasicValue, BasicValueEnum, FunctionValue, PointerValue,
-};
+use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::values::{BasicValue, FunctionValue, PointerValue};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-pub struct Compiler<'c> {
-    context: Context,
-    pub(crate) module: Module<'c>,
-    function_pass_manager: PassManager<FunctionValue<'c>>,
-    environment_stack: Stack<HashMap<Identifier, PointerValue<'c>>>,
-    function_stack: Stack<HashMap<Identifier, FunctionDeclaration>>,
+pub struct Compiler<'module, 'ctx> {
+    context: &'ctx Context,
+    pub(crate) module: &'ctx Module<'ctx>,
+    function_pass_manager: &'module PassManager<FunctionValue<'ctx>>,
+    environment_stack:
+        &'module mut Stack<HashMap<Identifier, PointerValue<'ctx>>>,
+    function_stack:
+        &'module mut Stack<HashMap<Identifier, FunctionDeclaration>>,
 }
 
-impl<'c> Compiler<'c> {
-    pub fn new() -> Self {
-        let context = Context::create();
-        let module = context.create_module("rox");
-        let mut environment_stack = Stack::new();
-        environment_stack.push(HashMap::new());
-        let (_, _, function_stack) = get_builtin_types();
-        let function_pass_manager = PassManager::create(&module);
-
+impl<'a, 'ctx> Compiler<'a, 'ctx> {
+    pub fn new(
+        context: &'ctx Context,
+        module: &'ctx Module<'ctx>,
+        function_pass_manager: &'a PassManager<FunctionValue<'ctx>>,
+        environment_stack: &'a mut Stack<
+            HashMap<Identifier, PointerValue<'ctx>>,
+        >,
+        function_stack: &'a mut Stack<HashMap<Identifier, FunctionDeclaration>>,
+    ) -> Self {
         // TODO: Which of these do we actually want?
         function_pass_manager.add_instruction_combining_pass();
         function_pass_manager.add_reassociate_pass();
@@ -51,15 +53,15 @@ impl<'c> Compiler<'c> {
         }
     }
 
-    pub fn compile(
-        &mut self,
-        declarations: Vec<Box<Statement>>,
-    ) -> Result<Vec<()>> {
-        self.compile_statements(&declarations)
+    pub fn compile(&mut self, declarations: Vec<Box<Statement>>) -> Result<()> {
+        match self.compile_statements(&declarations) {
+            Err(e) => Err(e),
+            Ok(_) => Ok(()),
+        }
     }
 
-    pub fn finish(self) -> T::Product {
-        self.module.finish()
+    pub fn finish(&self, path: impl Into<PathBuf> + Sized) -> bool {
+        self.module.write_bitcode_to_path(&path.into())
     }
 
     fn compile_statements(
@@ -100,13 +102,13 @@ impl<'c> Compiler<'c> {
                     return_type,
                 );
                 let entry = self.context.append_basic_block(fn_value, "entry");
-                let mut builder = self.context.create_builder();
+                let builder = self.context.create_builder();
                 builder.position_at_end(entry);
                 self.environment_stack.top_mut().reserve(params.len());
 
                 fn_value.get_param_iter().enumerate().for_each(
                     |(index, arg)| {
-                        let (arg_name, ty) = params[index].clone();
+                        let (arg_name, _ty) = params[index].clone();
                         let allocation = create_entry_block_allocation(
                             &builder,
                             arg_name.as_ref(),
@@ -124,18 +126,23 @@ impl<'c> Compiler<'c> {
                     .top_mut()
                     .insert(func_name.clone(), func_declaration.clone());
 
+                let current_state = CompilerState::new(
+                    builder,
+                    &self.context,
+                    fn_value,
+                    &self.module,
+                );
+
                 let mut function_translator = FunctionTranslator::new(
-                    &mut builder,
-                    &mut self.context,
-                    &mut fn_value,
-                    &mut self.environment_stack,
-                    &mut self.function_stack,
-                    &mut self.module,
+                    &current_state,
+                    self.environment_stack.top_mut(),
+                    self.function_stack.top_mut(),
                 );
 
                 function_translator.translate_function(block);
 
                 if fn_value.verify(true) {
+                    self.function_pass_manager.run_on(&fn_value);
                     Ok(())
                 } else {
                     Err(RoxError::with_file_placeholder(
@@ -146,7 +153,6 @@ impl<'c> Compiler<'c> {
             TaggedStatement::StructDeclaration => todo!(),
             _ => unreachable!(),
         };
-        self.function_pass_manager.run_on(&self.module);
         Ok(())
     }
 
@@ -155,18 +161,15 @@ impl<'c> Compiler<'c> {
         &self,
         func_name: String,
         params: &Vec<(Identifier, Type)>,
-        _return_type: &Type,
-    ) -> FunctionValue {
-        let mut param_types = params
+        return_type: &Type,
+    ) -> FunctionValue<'ctx> {
+        let param_types = params
             .iter()
-            .map(|(_, _)| self.context.f64_type().clone().into())
+            .map(|(_, ty)| CompilerState::get_type(self.context, ty))
             .collect::<Vec<_>>();
-        param_types.push(self.context.f64_type().into());
-        let fn_type = self
-            .context
-            .f64_type()
+        let fn_type = CompilerState::get_type(self.context, return_type)
             .fn_type(param_types.as_slice(), false);
-        let mut fn_value =
+        let fn_value =
             self.module.add_function(func_name.as_str(), fn_type, None);
         fn_value
             .get_param_iter()

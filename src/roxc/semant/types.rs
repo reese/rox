@@ -1,5 +1,4 @@
 use crate::roxc::Identifier;
-use inkwell::types::BasicTypeEnum;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[allow(dead_code)]

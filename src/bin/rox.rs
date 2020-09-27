@@ -36,12 +36,8 @@ enum Roxc {
 fn main() {
     let args = Roxc::from_args();
     let result = match args {
-        Roxc::Build {
-            file,
-            output,
-            no_link,
-        } => build_file(file, output, no_link),
-        Roxc::Run { file } => run_file(file),
+        Roxc::Build { file, output, .. } => build_file(file, output),
+        _ => todo!(),
     };
     if result.is_err() {
         result.err().unwrap().emit_error().unwrap();

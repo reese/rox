@@ -1,6 +1,5 @@
 #![allow(clippy::vec_box)]
 use crate::roxc::semant;
-use crate::roxc::{Type, TypeConstructor};
 
 #[derive(Clone, Debug)]
 pub enum Expression {
