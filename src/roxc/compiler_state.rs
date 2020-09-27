@@ -40,19 +40,25 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.module.get_function(name)
     }
 
-    pub fn get_type(context: &'c Context, ty: &Type) -> BasicTypeEnum<'c> {
+    pub fn get_type(
+        context: &'c Context,
+        ty: &Type,
+    ) -> Option<BasicTypeEnum<'c>> {
         match ty {
             Type::Apply(constructor, _) => {
                 use super::semant::TypeConstructor::*;
                 match constructor {
-                    Bool => context.bool_type().into(),
-                    Number => context.f64_type().into(),
-                    String => context
-                        .i64_type()
-                        .array_type(10)
-                        .ptr_type(AddressSpace::Generic)
-                        .into(),
-                    _ => todo!(),
+                    Bool => Some(context.bool_type().into()),
+                    Number => Some(context.f64_type().into()),
+                    String => Some(
+                        context
+                            .i64_type()
+                            .array_type(10)
+                            .ptr_type(AddressSpace::Generic)
+                            .into(),
+                    ),
+                    Void => None,
+                    x => todo!("Need to handle type constructor for: {:?}", x),
                 }
             }
             Type::Variable(_) => unimplemented!(),
@@ -222,7 +228,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
             .try_as_basic_value()
             .left()
         {
-            Some(value) => value.into(),
+            Some(value) => value,
             None => todo!("Handle returning void"),
         }
     }

@@ -99,7 +99,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
     ) -> BasicValueEnum<'ctx> {
         match expression {
             TaggedExpression::Boolean(bool) => {
-                self.current_state.bool_literal(*bool).clone()
+                self.current_state.bool_literal(*bool)
             }
             TaggedExpression::FunctionCall(function_name, args, _rox_type) => {
                 if let Some(function) =
@@ -128,7 +128,8 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 let llvm_type: BasicTypeEnum = CompilerState::get_type(
                     self.current_state.get_context(),
                     type_.as_ref(),
-                );
+                )
+                .expect("Unexpected void expression type");
                 llvm_type
                     .array_type(expression_values.len() as u32)
                     .const_array(expression_values.as_slice())
@@ -142,7 +143,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     self.translate_expression(expression);
                 let allocation = self.current_state.store_variable(name, value);
                 self.variables.insert(name.clone(), allocation);
-                value.clone()
+                value
             }
             TaggedExpression::Identifier(name, _rox_type) => {
                 let variable =

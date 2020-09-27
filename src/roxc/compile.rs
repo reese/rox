@@ -12,9 +12,9 @@ use inkwell::values::{BasicValue, FunctionValue, PointerValue};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub struct Compiler<'module, 'ctx> {
+pub struct Compiler<'module, 'ctx, 'm> {
     context: &'ctx Context,
-    pub(crate) module: &'ctx Module<'ctx>,
+    pub(crate) module: &'m Module<'ctx>,
     function_pass_manager: &'module PassManager<FunctionValue<'ctx>>,
     environment_stack:
         &'module mut Stack<HashMap<Identifier, PointerValue<'ctx>>>,
@@ -22,10 +22,10 @@ pub struct Compiler<'module, 'ctx> {
         &'module mut Stack<HashMap<Identifier, FunctionDeclaration>>,
 }
 
-impl<'a, 'ctx> Compiler<'a, 'ctx> {
+impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
     pub fn new(
         context: &'ctx Context,
-        module: &'ctx Module<'ctx>,
+        module: &'m Module<'ctx>,
         function_pass_manager: &'a PassManager<FunctionValue<'ctx>>,
         environment_stack: &'a mut Stack<
             HashMap<Identifier, PointerValue<'ctx>>,
@@ -152,8 +152,7 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
             }
             TaggedStatement::StructDeclaration => todo!(),
             _ => unreachable!(),
-        };
-        Ok(())
+        }
     }
 
     /// Compile the function signature
@@ -165,10 +164,18 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
     ) -> FunctionValue<'ctx> {
         let param_types = params
             .iter()
-            .map(|(_, ty)| CompilerState::get_type(self.context, ty))
+            .map(|(_, ty)| {
+                CompilerState::get_type(self.context, ty)
+                    .expect("Cannot handle void parameter type")
+            })
             .collect::<Vec<_>>();
-        let fn_type = CompilerState::get_type(self.context, return_type)
-            .fn_type(param_types.as_slice(), false);
+        let fn_type = match CompilerState::get_type(self.context, return_type) {
+            Some(t) => t.fn_type(param_types.as_slice(), false),
+            None => self
+                .context
+                .void_type()
+                .fn_type(param_types.as_slice(), false),
+        };
         let fn_value =
             self.module.add_function(func_name.as_str(), fn_type, None);
         fn_value
