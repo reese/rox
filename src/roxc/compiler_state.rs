@@ -221,16 +221,11 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         &self,
         function: FunctionValue<'c>,
         args: &[BasicValueEnum<'c>],
-    ) -> BasicValueEnum<'c> {
-        match self
-            .builder
+    ) -> Option<BasicValueEnum<'c>> {
+        self.builder
             .build_call(function, args, "tmp")
             .try_as_basic_value()
             .left()
-        {
-            Some(value) => value,
-            None => todo!("Handle returning void"),
-        }
     }
 
     pub fn position_at_end(&self, block: BasicBlock) {

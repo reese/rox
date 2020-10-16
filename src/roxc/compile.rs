@@ -182,8 +182,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
             .get_param_iter()
             .enumerate()
             .for_each(|(index, arg)| {
-                arg.into_float_value()
-                    .set_name(params.get(index).unwrap().0.as_str())
+                arg.set_name(params.get(index).unwrap().0.as_str())
             });
         fn_value
     }

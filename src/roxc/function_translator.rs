@@ -56,8 +56,12 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             },
             TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
-                    let return_ = self.translate_expression(expression);
-                    self.current_state.build_return(Some(&return_));
+                    if let Some(return_) = self.translate_expression(expression) {
+                        self.current_state.build_return(Some(&return_));
+                    }
+                    else {
+                        self.current_state.build_return(None);
+                    }
                 } else {
                     self.current_state.build_return(None);
                 }
@@ -66,7 +70,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 let if_block = self.current_state.append_basic_block("if");
                 let else_block = self.current_state.append_basic_block("else");
                 let merge_block = self.current_state.append_basic_block("continue");
-                let conditional_value = self.translate_expression(conditional).into_float_value();
+                let conditional_value = self.translate_expression(conditional).expect("Cannot evaluate condition with void value").into_float_value();
                 self.current_state.build_conditional(conditional_value, "ifcond", if_block, else_block);
 
                 self.read_into_block(Some(if_statements.clone()), if_block, merge_block);
@@ -96,10 +100,10 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
     pub fn translate_expression(
         &mut self,
         expression: &TaggedExpression,
-    ) -> BasicValueEnum<'ctx> {
+    ) -> Option<BasicValueEnum<'ctx>> {
         match expression {
             TaggedExpression::Boolean(bool) => {
-                self.current_state.bool_literal(*bool)
+                Some(self.current_state.bool_literal(*bool))
             }
             TaggedExpression::FunctionCall(function_name, args, _rox_type) => {
                 if let Some(function) =
@@ -107,7 +111,11 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 {
                     let argument_values: Vec<BasicValueEnum<'ctx>> = args
                         .iter()
-                        .map(|arg| self.translate_expression(arg))
+                        .map(|arg| {
+                            self.translate_expression(arg).expect(
+                                "Cannot pass void expression as argument",
+                            )
+                        })
                         .collect::<Vec<_>>();
 
                     self.current_state
@@ -117,43 +125,56 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 }
             }
             TaggedExpression::Number(num) => {
-                self.current_state.number_literal(*num)
+                Some(self.current_state.number_literal(*num))
             }
             // TODO: We should consider renaming Array to Vector (for all types), since it's not technically an array
             TaggedExpression::Array(tagged_expressions, type_) => {
                 let expression_values = tagged_expressions
                     .iter()
-                    .map(|t| self.translate_expression(t).into_array_value())
+                    .map(|t| {
+                        self.translate_expression(t)
+                            .expect("Cannot create array from void value")
+                            .into_array_value()
+                    })
                     .collect::<Vec<_>>();
                 let llvm_type: BasicTypeEnum = CompilerState::get_type(
                     self.current_state.get_context(),
                     type_.as_ref(),
                 )
                 .expect("Unexpected void expression type");
-                llvm_type
-                    .array_type(expression_values.len() as u32)
-                    .const_array(expression_values.as_slice())
-                    .into()
+                Some(
+                    llvm_type
+                        .array_type(expression_values.len() as u32)
+                        .const_array(expression_values.as_slice())
+                        .into(),
+                )
             }
             TaggedExpression::String(string) => {
-                self.current_state.string_literal(string)
+                Some(self.current_state.string_literal(string))
             }
             TaggedExpression::Variable(name, expression, _type_) => {
-                let value: BasicValueEnum<'ctx> =
-                    self.translate_expression(expression);
+                let value: BasicValueEnum<'ctx> = self
+                    .translate_expression(expression)
+                    .expect("Cannot define variable with void expression");
                 let allocation = self.current_state.store_variable(name, value);
                 self.variables.insert(name.clone(), allocation);
-                value
+                Some(value)
             }
             TaggedExpression::Identifier(name, _rox_type) => {
                 let variable =
                     self.variables.get(name).expect("Variable not defined");
-                self.current_state.load_variable(*variable, name)
+                Some(self.current_state.load_variable(*variable, name))
             }
             TaggedExpression::Operation(left, operation, right) => {
-                let lval = self.translate_expression(left).into_float_value();
-                let rval = self.translate_expression(right).into_float_value();
-                self.current_state.build_operation(lval, rval, operation)
+                let lval = self
+                    .translate_expression(left)
+                    .expect("Cannot perform operation on void value")
+                    .into_float_value();
+                let rval = self
+                    .translate_expression(right)
+                    .expect("Cannot perform operation on void value")
+                    .into_float_value();
+                Some(self.current_state.build_operation(lval, rval, operation))
             }
             TaggedExpression::StructInstantiation(_struct_type, _fields) => {
                 todo!()

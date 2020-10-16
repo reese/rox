@@ -37,6 +37,6 @@ fn main() {
     let args = Roxc::from_args();
     match args {
         Roxc::Build { file, output, .. } => build_file(file, output),
-        _ => todo!(),
+        _ => todo!("The JIT compiler for this hasn't been built yet. Instead, use the `build` command and run the executable."),
     };
 }
