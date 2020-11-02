@@ -27,14 +27,13 @@ name = "benchmark"
 harness = false
 
 [build-dependencies]
-lalrpop = { version = "0.18.1", features = ["lexer"] }
+lalrpop = { version = "0.19.1", features = ["lexer"] }
 
 [dependencies]
-codespan-reporting = "0.9.4"
+codespan-reporting = "0.9.5"
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm10-0" }
-lalrpop-util = "0.18.1"
+lalrpop-util = "0.19.1"
 structopt = "0.3.15"
-target-lexicon = "0.10.0"
 
 [dev-dependencies]
 criterion = "0.3.2"
