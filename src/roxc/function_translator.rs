@@ -4,7 +4,7 @@ use crate::roxc::{
 };
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
+use inkwell::values::{BasicValueEnum, PointerValue};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
