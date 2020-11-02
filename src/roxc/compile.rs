@@ -150,7 +150,11 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
                     ))
                 }
             }
-            TaggedStatement::StructDeclaration => todo!(),
+            // This is a no-op.
+            // Struct _declarations_ are entirely for the type system,
+            // and we'll later use the field order of the type
+            // to instantiate the struct.
+            TaggedStatement::StructDeclaration => Ok(()),
             _ => unreachable!(),
         }
     }
@@ -159,17 +163,30 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
     fn compile_prototype(
         &self,
         func_name: String,
-        params: &Vec<(Identifier, Type)>,
+        params: &[(Identifier, Type)],
         return_type: &Type,
     ) -> FunctionValue<'ctx> {
         let param_types = params
             .iter()
-            .map(|(_, ty)| {
-                CompilerState::get_type(self.context, ty)
-                    .expect("Cannot handle void parameter type")
+            .map(|(_ident, ty)| {
+                CompilerState::get_type(
+                    self.context,
+                    ty,
+                    self.environment_stack.top(),
+                    Some(0),
+                )
+                .expect(&*format!(
+                    "Cannot handle void parameter type or undefined type {:?}",
+                    ty
+                ))
             })
             .collect::<Vec<_>>();
-        let fn_type = match CompilerState::get_type(self.context, return_type) {
+        let fn_type = match CompilerState::get_type(
+            self.context,
+            return_type,
+            self.environment_stack.top(),
+            None,
+        ) {
             Some(t) => t.fn_type(param_types.as_slice(), false),
             None => self
                 .context

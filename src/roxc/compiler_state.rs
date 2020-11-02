@@ -1,14 +1,15 @@
-use crate::roxc::{Operation, Type};
+use crate::roxc::{Identifier, Operation, Type};
 use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
-use inkwell::types::BasicTypeEnum;
+use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
     BasicValue, BasicValueEnum, FloatValue, FunctionValue, InstructionValue,
     PointerValue,
 };
 use inkwell::{AddressSpace, FloatPredicate};
+use std::collections::HashMap;
 
 pub struct CompilerState<'f, 'c> {
     builder: Builder<'c>,
@@ -43,6 +44,8 @@ impl<'f, 'c> CompilerState<'f, 'c> {
     pub fn get_type(
         context: &'c Context,
         ty: &Type,
+        environment: &'f HashMap<Identifier, PointerValue<'c>>,
+        maybe_len: Option<usize>,
     ) -> Option<BasicTypeEnum<'c>> {
         match ty {
             Type::Apply(constructor, _) => {
@@ -52,8 +55,8 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                     Number => Some(context.f64_type().into()),
                     String => Some(
                         context
-                            .i64_type()
-                            .array_type(10)
+                            .i8_type()
+                            .array_type(maybe_len.unwrap() as u32) // 0 creates a variable sized array
                             .ptr_type(AddressSpace::Generic)
                             .into(),
                     ),
@@ -61,7 +64,9 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                     x => todo!("Need to handle type constructor for: {:?}", x),
                 }
             }
-            Type::Variable(_) => unimplemented!(),
+            Type::Variable(variable_name) => environment
+                .get(variable_name)
+                .map(|var| var.get_type().as_basic_type_enum()),
             Type::PolymorphicType(_formal_arguments, _types) => {
                 unimplemented!()
             }
@@ -115,7 +120,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.context.f64_type().const_float(num).into()
     }
 
-    pub fn string_literal(&self, string: &String) -> BasicValueEnum<'c> {
+    pub fn string_literal(&self, string: &str) -> BasicValueEnum<'c> {
         self.context.const_string(string.as_bytes(), false).into()
     }
 
@@ -129,7 +134,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
 
     pub fn store_variable(
         &self,
-        name: &String,
+        name: &str,
         value: BasicValueEnum<'c>,
     ) -> PointerValue<'c> {
         let allocation =
@@ -238,12 +243,6 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         name: &str,
         ty: BasicTypeEnum<'c>,
     ) -> PointerValue<'c> {
-        let entry = self.function.get_first_basic_block().unwrap();
-        if let Some(first_instruction) = entry.get_first_instruction() {
-            self.builder.position_before(&first_instruction);
-        } else {
-            self.builder.position_at_end(entry);
-        }
         self.builder.build_alloca(ty, name)
     }
 }

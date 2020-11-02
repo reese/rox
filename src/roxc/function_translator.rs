@@ -4,7 +4,7 @@ use crate::roxc::{
 };
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicValueEnum, PointerValue};
+use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
@@ -127,7 +127,6 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             TaggedExpression::Number(num) => {
                 Some(self.current_state.number_literal(*num))
             }
-            // TODO: We should consider renaming Array to Vector (for all types), since it's not technically an array
             TaggedExpression::Array(tagged_expressions, type_) => {
                 let expression_values = tagged_expressions
                     .iter()
@@ -140,11 +139,13 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 let llvm_type: BasicTypeEnum = CompilerState::get_type(
                     self.current_state.get_context(),
                     type_.as_ref(),
+                    self.variables,
+                    Some(tagged_expressions.len()),
                 )
                 .expect("Unexpected void expression type");
                 Some(
                     llvm_type
-                        .array_type(expression_values.len() as u32)
+                        .array_type(0)
                         .const_array(expression_values.as_slice())
                         .into(),
                 )
