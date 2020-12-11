@@ -138,6 +138,7 @@ AdditionOp: Operation = {
 
 Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
+    Char => Box::new(Expression::Char(<>)),
     Num => Box::new(Expression::Number(<>)),
     String => Box::new(Expression::String(<>)),
     Identifier => Box::new(Expression::Identifier(<>)),
@@ -156,6 +157,7 @@ Identifier: Identifier = {
 Type: Box<TypeName> = {
     Identifier => Box::new(TypeName::Type(<>)),
     <i: Identifier> "<" <t:Comma<Type>> ">" => Box::new(TypeName::GenericType(<>)),
+    "[" <t: Type> ";" <n: Num> "]" => Box::new(TypeName::ArrayType(<>)),
     FunctionType,
 }
 
@@ -175,6 +177,8 @@ Num: f64 = {
 String: String = {
     r#""[^"]*""# => <>.chars().skip(1).take(<>.len()-2).collect::<String>()
 }
+
+Char: char = { r#"'.'"# => <>.chars().nth(1).unwrap() };
 
 Comma<T>: Vec<T> = {
     <v:(<T> ",")*> <e:T?> => match e {

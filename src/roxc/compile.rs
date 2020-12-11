@@ -9,6 +9,7 @@ use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValue, FunctionValue, PointerValue};
+use inkwell::OptimizationLevel;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -60,7 +61,22 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
         }
     }
 
+    pub unsafe fn jit_compile(&self) -> Result<f64> {
+        self.module.print_to_stderr();
+        let execution_engine = self
+            .module
+            .create_jit_execution_engine(OptimizationLevel::Default)
+            .unwrap();
+        let func = execution_engine
+            .get_function::<unsafe extern "C" fn() -> f64>("main");
+        match func {
+            Ok(f) => Ok(f.call()),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn finish(&self, path: impl Into<PathBuf> + Sized) -> bool {
+        self.module.print_to_stderr();
         self.module.write_bitcode_to_path(&path.into())
     }
 
@@ -145,6 +161,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
                     self.function_pass_manager.run_on(&fn_value);
                     Ok(())
                 } else {
+                    fn_value.print_to_stderr();
                     Err(RoxError::with_file_placeholder(
                         "Invalid generated function",
                     ))
@@ -173,25 +190,20 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
                     self.context,
                     ty,
                     self.environment_stack.top(),
-                    Some(0),
                 )
-                .expect(&*format!(
-                    "Cannot handle void parameter type or undefined type {:?}",
-                    ty
-                ))
             })
             .collect::<Vec<_>>();
-        let fn_type = match CompilerState::get_type(
-            self.context,
-            return_type,
-            self.environment_stack.top(),
-            None,
-        ) {
-            Some(t) => t.fn_type(param_types.as_slice(), false),
-            None => self
-                .context
+        let fn_type = if return_type.is_void() {
+            self.context
                 .void_type()
-                .fn_type(param_types.as_slice(), false),
+                .fn_type(param_types.as_slice(), false)
+        } else {
+            CompilerState::get_type(
+                self.context,
+                return_type,
+                self.environment_stack.top(),
+            )
+            .fn_type(param_types.as_slice(), false)
         };
         let fn_value =
             self.module.add_function(func_name.as_str(), fn_type, None);

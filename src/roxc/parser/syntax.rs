@@ -8,6 +8,7 @@ pub enum Expression {
     Array(Vec<Box<Expression>>),
     Assignment(Box<Expression>, Box<Expression>),
     Boolean(bool),
+    Char(char),
     FunctionCall(Identifier, Vec<Box<TypeName>>, Vec<Box<Expression>>),
     Identifier(Identifier),
     Number(f64),
@@ -27,6 +28,7 @@ pub enum Expression {
 #[derive(Clone, Debug)]
 pub enum TypeName {
     Type(Identifier),
+    ArrayType(Box<TypeName>, f64),
     GenericType(Identifier, Vec<Box<TypeName>>),
     Function(Vec<Box<TypeName>>, Box<TypeName>),
 }

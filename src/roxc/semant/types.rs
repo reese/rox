@@ -1,3 +1,8 @@
+//! # Built-in types
+//! Rox has only a few built-in types, namely
+//! booleans, numbers, characters, fixed-length arrays,
+//! and structs.
+
 use crate::roxc::Identifier;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -5,10 +10,10 @@ use crate::roxc::Identifier;
 pub enum TypeConstructor {
     Bool,
     Number,
-    String,
+    Char,
     Void,
     Arrow,
-    Array,
+    Array(usize),
     /// The Record type constructor takes a list of field name identifiers and their types
     Record(Vec<(Identifier, Type)>),
     /// Takes the list of formal type parameters and the return type
@@ -46,6 +51,13 @@ impl Type {
         match self {
             Type::Apply(constructor, _) => constructor.get_record_fields(),
             _ => panic!("Tried to get record fields for non-record type"), // TODO: improve error handling
+        }
+    }
+
+    pub fn is_void(&self) -> bool {
+        match self {
+            Type::Apply(TypeConstructor::Void, _) => true,
+            _ => false,
         }
     }
 }

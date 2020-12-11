@@ -22,6 +22,7 @@
 //! To do this, we need to verify that all the application of our types are equal, or "unified."
 use crate::roxc::semant::types::{Type, TypeConstructor};
 use crate::roxc::semant::{TaggedExpression, TaggedStatement};
+use crate::roxc::TypeConstructor::Array;
 use crate::roxc::{
     builtins, Expression, FunctionDeclaration, Identifier, Result, RoxError,
     Statement, TypeName, Unary,
@@ -520,7 +521,7 @@ fn translate_expression(
             Ok(TaggedExpression::Array(
                 all_expressions,
                 Box::new(Type::Apply(
-                    TypeConstructor::Array,
+                    TypeConstructor::Array(expressions.len()),
                     vec![first_tagged_expression.into()],
                 )),
             ))
@@ -544,6 +545,7 @@ fn translate_expression(
             ))
         }
         Expression::Boolean(b) => Ok(TaggedExpression::Boolean(b)),
+        Expression::Char(c) => Ok(TaggedExpression::Char(c)),
         Expression::FunctionCall(ident, generic_type_idents, args) => {
             let instantiated_generics = generic_type_idents
                 .iter()
@@ -818,6 +820,10 @@ fn translate_type_identifier(
                     })
                     .collect::<Result<Vec<_>>>()?,
             ))
+        }
+        TypeName::ArrayType(type_, length) => {
+            let inner_type = translate_type_identifier(type_env, *type_)?;
+            Ok(Type::Apply(Array(length as usize), vec![inner_type]))
         }
     }
 }

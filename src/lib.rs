@@ -14,12 +14,11 @@ extern crate lalrpop_util;
 
 mod roxc;
 
-pub use crate::roxc::Result;
 use crate::roxc::{get_builtin_types, parse_file, Compiler, Stack};
+pub use crate::roxc::{Options, Result};
 use inkwell::context::Context;
 use inkwell::passes::PassManager;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 /// `run_file` reads the contents of the given path
 /// and runs them through the roxc.
@@ -30,22 +29,15 @@ use std::path::PathBuf;
 /// it would likely be a good idea to refactor these
 /// to have POSIX compliant error codes, or at least
 /// some consistent error code system.
-pub fn build_file(path: PathBuf, output: PathBuf) {
-    build_source_string(output, path);
-}
-
-/// Builds the given source string and links to the output file
-pub fn build_source_string(output: PathBuf, source: PathBuf) {
+pub fn build_file(options: Options) -> Result<()> {
     let context = Context::create();
-    compile_file(source, output, &context);
+    compile_file(options, &context)
 }
 
-fn compile_file<T>(input_file: T, object_file_output: T, context: &Context)
-where
-    T: Into<PathBuf> + Sized + Clone,
-{
+fn compile_file(options: Options, context: &Context) -> Result<()> {
+    let input_file = options.get_path();
     let module = context.create_module("rox");
-    let declarations = parse_file(input_file).unwrap();
+    let declarations = parse_file(input_file)?;
 
     // TODO: Clean this shit up
     let mut environment_stack = Stack::new();
@@ -60,6 +52,16 @@ where
         &mut environment_stack,
         &mut function_stack,
     );
-    compiler.compile(declarations).unwrap();
-    compiler.finish(object_file_output);
+
+    match options {
+        Options::Run { .. } => unsafe {
+            compiler.jit_compile()?;
+        },
+        Options::Build { output, .. } => {
+            compiler.compile(declarations)?;
+            compiler.finish(output);
+        }
+    }
+
+    Ok(())
 }

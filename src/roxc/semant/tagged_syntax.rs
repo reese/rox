@@ -16,6 +16,7 @@ pub enum TaggedExpression {
     Array(Vec<TaggedExpression>, Box<Type>),
     Assignment(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
     Boolean(bool),
+    Char(char),
     #[allow(clippy::vec_box)]
     FunctionCall(Identifier, Vec<TaggedExpression>, Box<Type>),
     Identifier(Identifier, Box<Type>),
@@ -37,12 +38,13 @@ impl Into<semant::Type> for TaggedExpression {
             | Assignment(_, _, t)
             | FunctionCall(_, _, t)
             | StructInstantiation(t, _)
+            | Variable(_, _, t)
             | Identifier(_, t) => t.as_ref().clone(),
-            And(_, _) | Boolean(_) => {
+            And(_, _) | Boolean(_) | Or(_, _) => {
                 Type::Apply(TypeConstructor::Bool, Vec::new())
             }
             Number(_) => Type::Apply(TypeConstructor::Number, Vec::new()),
-            String(_) => Type::Apply(TypeConstructor::String, Vec::new()),
+            Char(_) => Type::Apply(TypeConstructor::Char, Vec::new()),
             Operation(_, operation, _) => {
                 use parser::Operation::*;
                 match operation {
@@ -54,7 +56,8 @@ impl Into<semant::Type> for TaggedExpression {
                     }
                 }
             }
-            x => todo!("{:?}", x),
+            Unary(_, _, _) => Type::Apply(TypeConstructor::Number, Vec::new()),
+            String(_) => todo!("Handle strings"),
         }
     }
 }

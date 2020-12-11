@@ -2,6 +2,7 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::Config;
+use inkwell::execution_engine::FunctionLookupError;
 use lalrpop_util::lexer::Token;
 use lalrpop_util::{ErrorRecovery, ParseError};
 use std::fs::read_to_string;
@@ -29,6 +30,12 @@ pub struct RoxError {
     pub message: Option<String>,
     pub labels: Vec<Label<()>>,
     pub notes: Vec<String>,
+}
+
+impl From<FunctionLookupError> for RoxError {
+    fn from(err: FunctionLookupError) -> Self {
+        RoxError::with_file_placeholder(err.to_string().as_str())
+    }
 }
 
 impl RoxError {

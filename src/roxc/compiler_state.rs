@@ -5,8 +5,8 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
-    BasicValue, BasicValueEnum, FloatValue, FunctionValue, InstructionValue,
-    PointerValue,
+    BasicValue, BasicValueEnum, FloatValue, FunctionValue, InstructionOpcode,
+    InstructionValue, PointerValue,
 };
 use inkwell::{AddressSpace, FloatPredicate};
 use std::collections::HashMap;
@@ -45,28 +45,33 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         context: &'c Context,
         ty: &Type,
         environment: &'f HashMap<Identifier, PointerValue<'c>>,
-        maybe_len: Option<usize>,
-    ) -> Option<BasicTypeEnum<'c>> {
+    ) -> BasicTypeEnum<'c> {
         match ty {
-            Type::Apply(constructor, _) => {
+            Type::Apply(constructor, inner_types) => {
                 use super::semant::TypeConstructor::*;
                 match constructor {
-                    Bool => Some(context.bool_type().into()),
-                    Number => Some(context.f64_type().into()),
-                    String => Some(
-                        context
-                            .i8_type()
-                            .array_type(maybe_len.unwrap() as u32) // 0 creates a variable sized array
-                            .ptr_type(AddressSpace::Generic)
-                            .into(),
-                    ),
-                    Void => None,
+                    Array(length) => {
+                        let inner_type = inner_types.get(0).unwrap();
+                        let t = CompilerState::get_type(
+                            context,
+                            inner_type,
+                            environment,
+                        );
+                        t.array_type(*length as u32).ptr_type(AddressSpace::Generic).as_basic_type_enum()
+                    }
+                    Bool => context.bool_type().into(),
+                    Number => context.f64_type().into(),
+                    Char => context
+                        .i8_type()
+                        .into(),
+                    Void => panic!("Cannot handle void type here, handle with the `is_void` call first. Void types are only valid for function returns."),
                     x => todo!("Need to handle type constructor for: {:?}", x),
                 }
             }
             Type::Variable(variable_name) => environment
                 .get(variable_name)
-                .map(|var| var.get_type().as_basic_type_enum()),
+                .map(|var| var.get_type().as_basic_type_enum())
+                .unwrap(),
             Type::PolymorphicType(_formal_arguments, _types) => {
                 unimplemented!()
             }
@@ -109,6 +114,36 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.builder.build_unconditional_branch(merge_block);
     }
 
+    pub fn array_literal(
+        &self,
+        array_type: BasicTypeEnum<'c>,
+        values: Vec<BasicValueEnum<'c>>,
+    ) -> BasicValueEnum<'c> {
+        let allocation = self
+            .create_entry_block_allocation("", array_type.as_basic_type_enum());
+        values.iter().enumerate().for_each(|(index, value)| unsafe {
+            let pointer = self.builder.build_in_bounds_gep(
+                allocation,
+                &[self.context.i8_type().const_int(index as u64, false)],
+                "",
+            );
+            let cast_ptr = self.builder.build_cast(
+                InstructionOpcode::BitCast,
+                pointer,
+                array_type
+                    .into_pointer_type()
+                    .get_element_type()
+                    .into_array_type()
+                    .get_element_type()
+                    .ptr_type(AddressSpace::Generic),
+                "",
+            );
+            self.builder
+                .build_store(cast_ptr.into_pointer_value(), *value);
+        });
+        allocation.as_basic_value_enum()
+    }
+
     pub fn bool_literal(&self, boolean: bool) -> BasicValueEnum<'c> {
         self.context
             .bool_type()
@@ -116,12 +151,17 @@ impl<'f, 'c> CompilerState<'f, 'c> {
             .into()
     }
 
+    pub fn char_literal(&self, num: char) -> BasicValueEnum<'c> {
+        self.context.i8_type().const_int(num as u64, false).into()
+    }
+
     pub fn number_literal(&self, num: f64) -> BasicValueEnum<'c> {
         self.context.f64_type().const_float(num).into()
     }
 
-    pub fn string_literal(&self, string: &str) -> BasicValueEnum<'c> {
-        self.context.const_string(string.as_bytes(), false).into()
+    #[allow(dead_code)]
+    pub fn string_literal(&self, _string: &str) -> BasicValueEnum<'c> {
+        todo!("")
     }
 
     pub fn load_variable(
@@ -140,6 +180,27 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         let allocation =
             self.create_entry_block_allocation(name, value.get_type());
         self.builder.build_store(allocation, value);
+        allocation
+    }
+
+    pub fn build_struct(
+        &self,
+        field_type: Vec<BasicTypeEnum<'c>>,
+        fields: Vec<BasicValueEnum<'c>>,
+    ) -> PointerValue<'c> {
+        let struct_type = self.context.struct_type(field_type.as_slice(), true);
+        let allocation = self.create_entry_block_allocation(
+            "",
+            struct_type.as_basic_type_enum(),
+        );
+        fields.iter().enumerate().for_each(|(index, value)| unsafe {
+            let pointer = self
+                .builder
+                .build_struct_gep(allocation, index as u32, "")
+                .unwrap();
+            self.builder.build_store(pointer, *value);
+        });
+
         allocation
     }
 

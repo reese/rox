@@ -3,8 +3,8 @@ use crate::roxc::{
     FunctionDeclaration, Identifier, TaggedExpression, TaggedStatement,
 };
 use inkwell::basic_block::BasicBlock;
-use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicValueEnum, PointerValue};
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
@@ -124,6 +124,9 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     panic!("Attempted to build a function not in this module.")
                 }
             }
+            TaggedExpression::Char(ch) => {
+                Some(self.current_state.char_literal(*ch))
+            }
             TaggedExpression::Number(num) => {
                 Some(self.current_state.number_literal(*num))
             }
@@ -133,25 +136,21 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     .map(|t| {
                         self.translate_expression(t)
                             .expect("Cannot create array from void value")
-                            .into_array_value()
                     })
                     .collect::<Vec<_>>();
                 let llvm_type: BasicTypeEnum = CompilerState::get_type(
                     self.current_state.get_context(),
                     type_.as_ref(),
                     self.variables,
-                    Some(tagged_expressions.len()),
-                )
-                .expect("Unexpected void expression type");
+                );
                 Some(
-                    llvm_type
-                        .array_type(0)
-                        .const_array(expression_values.as_slice())
-                        .into(),
+                    self.current_state
+                        .array_literal(llvm_type, expression_values),
                 )
             }
-            TaggedExpression::String(string) => {
-                Some(self.current_state.string_literal(string))
+            TaggedExpression::String(_string) => {
+                todo!("Strings are not yet supported, waiting on char support and more builtins")
+                // Some(self.current_state.string_literal(string))
             }
             TaggedExpression::Variable(name, expression, _type_) => {
                 let value: BasicValueEnum<'ctx> = self
@@ -177,8 +176,35 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     .into_float_value();
                 Some(self.current_state.build_operation(lval, rval, operation))
             }
-            TaggedExpression::StructInstantiation(_struct_type, _fields) => {
-                todo!()
+            TaggedExpression::StructInstantiation(struct_type, fields) => {
+                let values = struct_type
+                    .get_record_fields()
+                    .iter()
+                    .map(|(name, _)| {
+                        // TODO: Improve error handling - or we can assume that the type
+                        // checker would catch misnamed fields?
+                        let (_, value) =
+                            fields.iter().find(|(f, _)| f == name).unwrap();
+                        self.translate_expression(value)
+                            .expect("Cannot store void value in struct")
+                    })
+                    .collect::<Vec<_>>();
+                let field_types = struct_type
+                    .get_record_fields()
+                    .iter()
+                    .map(|(_, type_)| {
+                        CompilerState::get_type(
+                            self.current_state.get_context(),
+                            type_,
+                            self.variables,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                Some(
+                    self.current_state
+                        .build_struct(field_types, values)
+                        .as_basic_value_enum(),
+                )
             }
             x => unimplemented!("{:?}", x),
         }
