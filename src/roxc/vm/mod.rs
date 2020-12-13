@@ -8,7 +8,6 @@ pub(crate) use crate::roxc::vm::opcode::OpCode;
 pub(crate) use crate::roxc::vm::value::Value;
 use crate::roxc::Stack;
 pub(crate) use chunk::Chunk;
-use im::HashMap;
 
 pub(crate) struct VM {
     chunk: Chunk,
@@ -113,8 +112,21 @@ impl VM {
                 }
                 OpCode::AssignVariable(index) => {
                     // N.B. We might want to read, store, then pop in case of garbage collection
-                    let value = self.stack.pop().unwrap();
-                    self.stack.set(*index, value);
+                    self.stack.set(*index, self.stack.top().clone());
+                }
+                OpCode::Placeholder => unreachable!(
+                    "The jump offset placeholder was never replaced."
+                ),
+                OpCode::JumpIfFalse => {
+                    let conditional = self.stack.pop().unwrap().read_bool();
+                    let offset = self.stack.pop().unwrap().read_number();
+                    if !conditional {
+                        instruction_pointer += offset
+                    }
+                }
+                OpCode::Jump => {
+                    let offset = self.stack.pop().unwrap().read_number();
+                    instruction_pointer += offset;
                 }
             }
             instruction_pointer += 1;

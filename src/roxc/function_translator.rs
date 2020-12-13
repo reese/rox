@@ -93,7 +93,7 @@ impl<'c> FunctionTranslator<'c> {
             // if one exists. For the most part, we use this as a way to use
             // `libc` functions, but this could potentially be used to link a
             // Rust runtime library, but that's still undetermined.
-            ExternFunctionDeclaration(decl) => {
+            ExternFunctionDeclaration(_decl) => {
                 todo!()
                 // self.functions.insert(decl.name.clone(), decl.clone());
             }
@@ -104,8 +104,25 @@ impl<'c> FunctionTranslator<'c> {
                 self.chunk.write(OpCode::Return);
                 Ok(())
             }
-            IfElse(_conditional, _if_statements, _else_statements_maybe) => {
-                todo!()
+            IfElse(conditional, if_statements, else_statements_maybe) => {
+                self.translate_expression(conditional);
+                let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+                self.chunk.write(OpCode::Pop);
+                if_statements
+                    .iter()
+                    .map(|statement| self.translate_statement(statement))
+                    .collect::<Result<Vec<_>>>()?;
+                let else_jump = self.emit_jump(OpCode::Jump);
+                self.patch_jump(then_jump);
+                self.chunk.write(OpCode::Pop);
+                if let Some(else_statements) = else_statements_maybe {
+                    else_statements
+                        .iter()
+                        .map(|statement| self.translate_statement(statement))
+                        .collect::<Result<Vec<_>>>()?;
+                }
+                self.patch_jump(else_jump);
+                Ok(())
             }
         }
     }
@@ -186,5 +203,16 @@ impl<'c> FunctionTranslator<'c> {
         }
 
         unreachable!()
+    }
+
+    fn emit_jump(&mut self, instruction: OpCode) -> usize {
+        self.chunk.write(instruction);
+        self.chunk.write(OpCode::Placeholder);
+        self.chunk.opcodes.len() - 1
+    }
+
+    fn patch_jump(&mut self, offset: usize) {
+        let jump = self.chunk.opcodes.len() - offset - 1;
+        self.chunk.opcodes[offset] = OpCode::Constant(jump);
     }
 }

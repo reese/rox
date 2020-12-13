@@ -28,4 +28,9 @@ pub(crate) enum OpCode {
     /* Variables */
     ReadVariable(usize),
     AssignVariable(usize),
+
+    /* Control Flow */
+    Placeholder,
+    JumpIfFalse,
+    Jump,
 }

@@ -13,15 +13,21 @@ impl Value {
     pub(crate) fn create_string(str: String) -> Self {
         Value::Obj(Rc::new(Object::String(str)))
     }
-    pub(crate) fn read_string(&self) -> &String {
-        if let Value::Obj(obj) = self {
-            if let Object::String(string) = obj.as_ref() {
-                string
-            } else {
-                unreachable!()
-            }
+    /// Read an index constant. Used
+    /// for offsets in jumps and indices
+    pub(crate) fn read_number(&self) -> usize {
+        if let Value::Number(num) = self {
+            *num as usize
         } else {
-            unreachable!()
+            unreachable!("Encountered unexpected value: {:?}", self);
+        }
+    }
+
+    pub(crate) fn read_bool(&self) -> bool {
+        if let Value::Bool(bool) = self {
+            *bool
+        } else {
+            unreachable!("Encountered unexpected value: {:?}", self);
         }
     }
 }
