@@ -406,22 +406,18 @@ fn translate_statement(
                 Box::new(expr_value.into()),
             ))
         }
-        Statement::Assignment(left_expr, right_expr) => {
-            let tagged_left = translate_expression(
-                type_env,
-                variable_env,
-                left_expr.as_ref().clone(),
-            )?;
+        Statement::Assignment(ident, right_expr) => {
+            let tagged_left = variable_env.get(&ident).unwrap().clone();
             let tagged_right = translate_expression(
                 type_env,
                 variable_env,
                 right_expr.as_ref().clone(),
             )?;
-            unify(tagged_left.clone().into(), tagged_right.clone().into())?;
+            unify(tagged_left.clone(), tagged_right.clone().into())?;
             Ok(TaggedStatement::Assignment(
-                Box::new(tagged_left.clone()),
+                ident,
                 Box::new(tagged_right),
-                Box::new(tagged_left.into()),
+                Box::new(tagged_left),
             ))
         }
         Statement::Expression(expression) => {

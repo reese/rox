@@ -8,16 +8,10 @@ impl<T> Stack<T> {
         Stack { stack: Vec::new() }
     }
 
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.stack.is_empty()
-    }
-
     pub fn push(&mut self, item: T) {
         self.stack.push(item);
     }
 
-    #[allow(dead_code)]
     pub fn pop(&mut self) -> Option<T> {
         self.stack.pop()
     }
@@ -28,5 +22,13 @@ impl<T> Stack<T> {
 
     pub fn top_mut(&mut self) -> &mut T {
         self.stack.last_mut().expect("No items on stack")
+    }
+
+    pub fn get_unchecked(&self, index: usize) -> &T {
+        &self.stack[index]
+    }
+
+    pub fn set(&mut self, index: usize, value: T) {
+        self.stack[index] = value;
     }
 }

@@ -1,4 +1,10 @@
 pub(crate) struct Local {
-    name: String,
-    depth: u8,
+    pub(crate) name: String,
+    pub(crate) depth: i32,
+}
+
+impl Local {
+    pub(crate) fn new(name: String, depth: i32) -> Self {
+        Local { name, depth }
+    }
 }

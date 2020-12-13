@@ -1,21 +1,19 @@
 use crate::roxc::local::Local;
-use crate::roxc::parser;
-use crate::roxc::vm::object::Object;
 use crate::roxc::vm::{Chunk, OpCode, Value};
+use crate::roxc::{parser, Result, RoxError};
 use crate::roxc::{TaggedExpression, TaggedStatement};
-use std::rc::Rc;
 
 pub(crate) struct FunctionTranslator<'c> {
     chunk: &'c mut Chunk,
     locals: Vec<Local>,
-    scope_depth: u8,
+    scope_depth: i32,
 }
 
 impl<'c> FunctionTranslator<'c> {
     pub(crate) fn new(
         chunk: &'c mut Chunk,
         locals: Vec<Local>,
-        scope_depth: u8,
+        scope_depth: i32,
     ) -> Self {
         FunctionTranslator {
             chunk,
@@ -24,30 +22,66 @@ impl<'c> FunctionTranslator<'c> {
         }
     }
 
-    pub(crate) fn translate_function(&mut self, block: &[TaggedStatement]) {
-        block.iter().for_each(|statement| {
-            self.translate_statement(statement);
-        })
+    pub(crate) fn translate_function(
+        &mut self,
+        block: &[TaggedStatement],
+    ) -> Result<()> {
+        block
+            .iter()
+            .map(|statement| self.translate_statement(statement))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(())
     }
 
-    fn translate_statement(&mut self, statement: &TaggedStatement) {
+    fn translate_statement(
+        &mut self,
+        statement: &TaggedStatement,
+    ) -> Result<()> {
         use TaggedStatement::*;
         match &statement {
-            StructDeclaration => {}
+            StructDeclaration => todo!(),
             Block(statements) => {
-                statements.iter().for_each(|s| self.translate_statement(s));
+                self.start_scope();
+                statements
+                    .iter()
+                    .map(|s| self.translate_statement(s))
+                    .collect::<Result<Vec<_>>>()?;
+                self.end_scope();
+                Ok(())
             }
+            // Notes about variables:
+            // As of right now, the concept of "global" variables
+            // (i.e. late-bound static variables) doesn't really exist.
+            // All of Rox's variables are "local," as if the entire program
+            // is run inside of one giant function.
+            // Because all variables are bound at compile time, we don't actually
+            // _need_ to track them by name
             Variable(name, expression, _type) => {
                 self.translate_expression(expression);
-                self.chunk
-                    .add_constant(Value::create_string(name.to_string()));
-                self.chunk.write(OpCode::DeclareVariable);
+                let ident_is_already_declared = |local: &Local| {
+                    local.depth >= self.scope_depth
+                        && local.name == name.clone()
+                };
+                if self.locals.iter().rev().any(ident_is_already_declared) {
+                    return Err(RoxError::with_file_placeholder(
+                        "Identifier already declared in this scope.",
+                    ));
+                }
+                self.locals
+                    .push(Local::new(name.to_string(), self.scope_depth));
+                Ok(())
             }
-            Assignment(_, _, _) => todo!(),
+            Assignment(name, right_expr, _type) => {
+                self.translate_expression(right_expr);
+                self.chunk
+                    .write(OpCode::AssignVariable(self.resolve_local(name)));
+                Ok(())
+            }
             Expression(expression) => {
                 self.translate_expression(expression);
                 // Pop residual value off the stack
                 self.chunk.write(OpCode::Pop);
+                Ok(())
             }
             FunctionDeclaration(..) => todo!(),
             // TODO: Do we need external functions like this
@@ -63,8 +97,14 @@ impl<'c> FunctionTranslator<'c> {
                 todo!()
                 // self.functions.insert(decl.name.clone(), decl.clone());
             }
-            Return(maybe_expression) => todo!(),
-            IfElse(conditional, if_statements, else_statements_maybe) => {
+            Return(maybe_expression) => {
+                if let Some(expr) = maybe_expression.as_ref() {
+                    self.translate_expression(expr)
+                }
+                self.chunk.write(OpCode::Return);
+                Ok(())
+            }
+            IfElse(_conditional, _if_statements, _else_statements_maybe) => {
                 todo!()
             }
         }
@@ -78,18 +118,16 @@ impl<'c> FunctionTranslator<'c> {
                 true => self.chunk.write(OpCode::True),
                 false => self.chunk.write(OpCode::False),
             },
-            FunctionCall(function_name, args, _rox_type) => todo!(),
-            Array(tagged_expressions, type_) => todo!(),
+            FunctionCall(_function_name, _args, _rox_type) => todo!(),
+            Array(_tagged_expressions, _type_) => todo!(),
             // TODO: escape characters, template strings
             String(string) => {
                 self.chunk
                     .add_constant(Value::create_string(string.clone()));
             }
-            Identifier(name, _rox_type) => {
-                self.chunk
-                    .add_constant(Value::create_string(name.to_string()));
-                self.chunk.write(OpCode::ReadVariable)
-            }
+            Identifier(name, _rox_type) => self
+                .chunk
+                .write(OpCode::ReadVariable(self.resolve_local(name))),
             StructInstantiation(_struct_type, _fields) => todo!(),
             Operation(left, operation, right) => {
                 self.translate_expression(left);
@@ -121,5 +159,32 @@ impl<'c> FunctionTranslator<'c> {
                 }
             }
         }
+    }
+
+    fn start_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+
+        let mut index = self.locals.len() - 1;
+        while !self.locals.is_empty()
+            && self.locals[index].depth > self.scope_depth
+        {
+            self.chunk.write(OpCode::Pop);
+            self.locals.pop();
+            index -= 1;
+        }
+    }
+
+    fn resolve_local(&self, name: &String) -> usize {
+        for (index, local) in self.locals.iter().rev().enumerate() {
+            if &local.name == name {
+                return index;
+            }
+        }
+
+        unreachable!()
     }
 }

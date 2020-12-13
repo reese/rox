@@ -34,7 +34,7 @@ Statement: Box<Statement> = {
 Assignment: Box<Statement> = {
     // TODO: Allow for assignment to function results
     // i.e. `some_call().attribute = 3;`
-    <Call> "=" <Expression> ";" => Box::new(Statement::Assignment(<>)),
+    <Identifier> "=" <Expression> ";" => Box::new(Statement::Assignment(<>)),
     "let" <Identifier> "=" <Expression> ";" => Box::new(Statement::Variable(<>)),
 }
 

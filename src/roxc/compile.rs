@@ -35,7 +35,7 @@ impl Compiler {
         let tagged_statements = analyse_program(declarations.to_vec())?;
         let mut translator =
             FunctionTranslator::new(&mut self.chunk, Vec::new(), 0);
-        translator.translate_function(tagged_statements.as_slice());
+        translator.translate_function(tagged_statements.as_slice())?;
         Ok(())
     }
 }

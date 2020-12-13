@@ -60,7 +60,7 @@ type TaggedBlock = Vec<TaggedStatement>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TaggedStatement {
-    Assignment(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
+    Assignment(Identifier, Box<TaggedExpression>, Box<Type>),
     Block(Vec<TaggedStatement>),
     Expression(TaggedExpression),
     ExternFunctionDeclaration(FunctionDeclaration),

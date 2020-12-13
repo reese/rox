@@ -6,30 +6,27 @@ pub(crate) mod value;
 use super::errors::Result;
 pub(crate) use crate::roxc::vm::opcode::OpCode;
 pub(crate) use crate::roxc::vm::value::Value;
-use crate::roxc::{RoxError, Stack};
+use crate::roxc::Stack;
 pub(crate) use chunk::Chunk;
 use im::HashMap;
 
 pub(crate) struct VM {
     chunk: Chunk,
     stack: Stack<Value>,
-    variables: Stack<HashMap<String, Value>>,
 }
 
 impl VM {
     pub(crate) fn new(chunk: Chunk) -> Self {
-        let mut variables = Stack::new();
-        variables.push(HashMap::new());
         VM {
             chunk,
             stack: Stack::new(),
-            variables,
         }
     }
 
     pub(crate) fn interpret(&mut self) -> Result<()> {
-        let mut instruction_pointer = self.chunk.opcodes.iter();
-        while let Some(ip) = instruction_pointer.next() {
+        let mut instruction_pointer = 0;
+        while instruction_pointer < self.chunk.opcodes.len() {
+            let ip = self.chunk.opcodes.get(instruction_pointer).unwrap();
             match ip {
                 OpCode::Return => return Ok(()),
                 OpCode::Constant(index) => {
@@ -111,40 +108,16 @@ impl VM {
                 OpCode::Pop => {
                     self.stack.pop().unwrap();
                 }
-                OpCode::DeclareVariable => {
-                    let name = self.stack.pop().unwrap().read_string().clone();
-                    // Don't allow variable shadowing
-                    if self.variables.top().contains_key(name.as_str()) {
-                        return Err(RoxError::with_file_placeholder(
-                            "This key is already defined",
-                        ));
-                    }
+                OpCode::ReadVariable(index) => {
+                    self.stack.push(self.stack.get_unchecked(*index).clone());
+                }
+                OpCode::AssignVariable(index) => {
                     // N.B. We might want to read, store, then pop in case of garbage collection
                     let value = self.stack.pop().unwrap();
-                    self.variables.top_mut().insert(name, value);
-                }
-                OpCode::ReadVariable => {
-                    let name = self.stack.pop().unwrap().read_string().clone();
-                    if let Some(value) = self.variables.top().get(&name) {
-                        self.stack.push(value.clone())
-                    } else {
-                        return Err(RoxError::with_file_placeholder(
-                            "Variable has not yet been defined",
-                        ));
-                    }
-                }
-                OpCode::AssignVariable => {
-                    let name = self.stack.pop().unwrap().read_string().clone();
-                    if !self.variables.top().contains_key(name.as_str()) {
-                        return Err(RoxError::with_file_placeholder(
-                            "Variable has not yet been defined",
-                        ));
-                    }
-                    // N.B. We might want to read, store, then pop in case of garbage collection
-                    let value = self.stack.pop().unwrap();
-                    self.variables.top_mut().insert(name, value);
+                    self.stack.set(*index, value);
                 }
             }
+            instruction_pointer += 1;
         }
         Ok(())
     }

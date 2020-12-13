@@ -63,7 +63,7 @@ pub struct FunctionDeclaration {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
-    Assignment(Box<Expression>, Box<Expression>),
+    Assignment(Identifier, Box<Expression>),
     Block(Vec<Box<Statement>>),
     Expression(Box<Expression>),
     Return(Option<Box<Expression>>),

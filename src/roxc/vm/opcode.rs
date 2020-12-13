@@ -26,7 +26,6 @@ pub(crate) enum OpCode {
     False,
 
     /* Variables */
-    DeclareVariable,
-    ReadVariable,
-    AssignVariable,
+    ReadVariable(usize),
+    AssignVariable(usize),
 }
