@@ -15,10 +15,7 @@ extern crate lalrpop_util;
 mod roxc;
 
 pub use crate::roxc::Result;
-use crate::roxc::{get_builtin_types, parse_file, Compiler, Stack};
-use inkwell::context::Context;
-use inkwell::passes::PassManager;
-use std::collections::HashMap;
+use crate::roxc::{get_builtin_types, parse_file, Compiler};
 use std::path::PathBuf;
 
 /// `run_file` reads the contents of the given path
@@ -36,30 +33,19 @@ pub fn build_file(path: PathBuf, output: PathBuf) {
 
 /// Builds the given source string and links to the output file
 pub fn build_source_string(output: PathBuf, source: PathBuf) {
-    let context = Context::create();
-    compile_file(source, output, &context);
+    compile_file(source, output);
 }
 
-fn compile_file<T>(input_file: T, object_file_output: T, context: &Context)
+fn compile_file<T>(input_file: T, object_file_output: T)
 where
     T: Into<PathBuf> + Sized + Clone,
 {
-    let module = context.create_module("rox");
     let declarations = parse_file(input_file).unwrap();
 
     // TODO: Clean this shit up
-    let mut environment_stack = Stack::new();
-    environment_stack.push(HashMap::new());
-    let (_, _, mut function_stack) = get_builtin_types();
-    let function_pass_manager = PassManager::create(&module);
+    // let (_, _, function_stack) = get_builtin_types();
 
-    let mut compiler = Compiler::new(
-        &context,
-        &module,
-        &function_pass_manager,
-        &mut environment_stack,
-        &mut function_stack,
-    );
+    let mut compiler = Compiler::new();
     compiler.compile(declarations).unwrap();
     compiler.finish(object_file_output);
 }

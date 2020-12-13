@@ -23,10 +23,19 @@ Block: Block = {
 
 Statement: Box<Statement> = {
     <Expression> ";" => Box::new(Statement::Expression(<>)),
-    <ReturnStatement>,
-    <Function>,
-    <StructDeclaration>,
+    Block => Box::new(Statement::Block(<>)),
+    ReturnStatement,
+    Function,
+    StructDeclaration,
+    Assignment,
     "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
+}
+
+Assignment: Box<Statement> = {
+    // TODO: Allow for assignment to function results
+    // i.e. `some_call().attribute = 3;`
+    <Call> "=" <Expression> ";" => Box::new(Statement::Assignment(<>)),
+    "let" <Identifier> "=" <Expression> ";" => Box::new(Statement::Variable(<>)),
 }
 
 ReturnStatement: Box<Statement> = {
@@ -34,14 +43,10 @@ ReturnStatement: Box<Statement> = {
 }
 
 Expression: Box<Expression> = {
-    Assignment
+    StructInstantiation
 }
 
-Assignment: Box<Expression> = {
-    // TODO: Allow for assignment to function results
-    // i.e. `some_call().attribute = 3;`
-    <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
-    "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
+StructInstantiation: Box<Expression> = {
     <Identifier><("::" "<" <Comma<Type>> ">")?> "{" <Comma<(<Identifier> ":" <Expression>)>> "}" => Box::new(Expression::StructInstantiation(<>)),
     LogicOr
 }

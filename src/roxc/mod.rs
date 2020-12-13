@@ -9,9 +9,10 @@ pub use stack::*;
 
 mod builtins;
 mod compile;
-mod compiler_state;
 mod errors;
 mod function_translator;
+mod local;
 mod parser;
 mod semant;
 mod stack;
+mod vm;

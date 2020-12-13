@@ -216,6 +216,18 @@ fn translate_statement(
     statement: Statement,
 ) -> Result<TaggedStatement> {
     match statement {
+        Statement::Block(statements) => Ok(TaggedStatement::Block(
+            statements
+                .iter()
+                .map(|s| {
+                    translate_statement(
+                        type_env,
+                        variable_env,
+                        s.as_ref().clone(),
+                    )
+                })
+                .collect::<Result<Vec<TaggedStatement>>>()?,
+        )),
         Statement::ExternFunctionDeclaration(
             func_name,
             parameters,
@@ -381,6 +393,37 @@ fn translate_statement(
                 tagged_statements,
             ))
         }
+        Statement::Variable(ident, expr) => {
+            let expr_value = translate_expression(
+                type_env,
+                variable_env,
+                expr.as_ref().clone(),
+            )?;
+            variable_env.insert(ident.clone(), expr_value.clone().into());
+            Ok(TaggedStatement::Variable(
+                ident,
+                Box::new(expr_value.clone()),
+                Box::new(expr_value.into()),
+            ))
+        }
+        Statement::Assignment(left_expr, right_expr) => {
+            let tagged_left = translate_expression(
+                type_env,
+                variable_env,
+                left_expr.as_ref().clone(),
+            )?;
+            let tagged_right = translate_expression(
+                type_env,
+                variable_env,
+                right_expr.as_ref().clone(),
+            )?;
+            unify(tagged_left.clone().into(), tagged_right.clone().into())?;
+            Ok(TaggedStatement::Assignment(
+                Box::new(tagged_left.clone()),
+                Box::new(tagged_right),
+                Box::new(tagged_left.into()),
+            ))
+        }
         Statement::Expression(expression) => {
             Ok(TaggedStatement::Expression(translate_expression(
                 type_env,
@@ -525,24 +568,7 @@ fn translate_expression(
                 )),
             ))
         }
-        Expression::Assignment(left_expr, right_expr) => {
-            let tagged_left = translate_expression(
-                type_env,
-                variable_env,
-                left_expr.as_ref().clone(),
-            )?;
-            let tagged_right = translate_expression(
-                type_env,
-                variable_env,
-                right_expr.as_ref().clone(),
-            )?;
-            unify(tagged_left.clone().into(), tagged_right.clone().into())?;
-            Ok(TaggedExpression::Assignment(
-                Box::new(tagged_left.clone()),
-                Box::new(tagged_right),
-                Box::new(tagged_left.into()),
-            ))
-        }
+
         Expression::Boolean(b) => Ok(TaggedExpression::Boolean(b)),
         Expression::FunctionCall(ident, generic_type_idents, args) => {
             let instantiated_generics = generic_type_idents
@@ -736,19 +762,7 @@ fn translate_expression(
                 unimplemented!("{:?}", struct_type)
             }
         }
-        Expression::Variable(ident, expr) => {
-            let expr_value = translate_expression(
-                type_env,
-                variable_env,
-                expr.as_ref().clone(),
-            )?;
-            variable_env.insert(ident.clone(), expr_value.clone().into());
-            Ok(TaggedExpression::Variable(
-                ident,
-                Box::new(expr_value.clone()),
-                Box::new(expr_value.into()),
-            ))
-        }
+
         Expression::Unary(unary, expr) => {
             let tagged_expression = translate_expression(
                 type_env,

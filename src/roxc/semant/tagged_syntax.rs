@@ -14,7 +14,6 @@ pub enum TaggedExpression {
     Access(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
     And(Box<TaggedExpression>, Box<TaggedExpression>),
     Array(Vec<TaggedExpression>, Box<Type>),
-    Assignment(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
     Boolean(bool),
     #[allow(clippy::vec_box)]
     FunctionCall(Identifier, Vec<TaggedExpression>, Box<Type>),
@@ -25,7 +24,6 @@ pub enum TaggedExpression {
     String(String),
     StructInstantiation(Box<Type>, Vec<(Identifier, Box<TaggedExpression>)>),
     Unary(Unary, Box<TaggedExpression>, Box<Type>),
-    Variable(Identifier, Box<TaggedExpression>, Box<Type>),
 }
 
 impl Into<semant::Type> for TaggedExpression {
@@ -34,7 +32,6 @@ impl Into<semant::Type> for TaggedExpression {
         match self {
             Access(_, _, t)
             | Array(_, t)
-            | Assignment(_, _, t)
             | FunctionCall(_, _, t)
             | StructInstantiation(t, _)
             | Identifier(_, t) => t.as_ref().clone(),
@@ -63,10 +60,13 @@ type TaggedBlock = Vec<TaggedStatement>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TaggedStatement {
+    Assignment(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
+    Block(Vec<TaggedStatement>),
     Expression(TaggedExpression),
     ExternFunctionDeclaration(FunctionDeclaration),
     FunctionDeclaration(FunctionDeclaration, TaggedBlock),
     StructDeclaration,
     IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
     Return(Option<TaggedExpression>),
+    Variable(Identifier, Box<TaggedExpression>, Box<Type>),
 }

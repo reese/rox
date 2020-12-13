@@ -6,7 +6,6 @@ pub enum Expression {
     Access(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     Array(Vec<Box<Expression>>),
-    Assignment(Box<Expression>, Box<Expression>),
     Boolean(bool),
     FunctionCall(Identifier, Vec<Box<TypeName>>, Vec<Box<Expression>>),
     Identifier(Identifier),
@@ -20,7 +19,6 @@ pub enum Expression {
         Vec<(Identifier, Box<Expression>)>,
     ),
     Unary(Unary, Box<Expression>),
-    Variable(Identifier, Box<Expression>),
     ParseError,
 }
 
@@ -65,6 +63,8 @@ pub struct FunctionDeclaration {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
+    Assignment(Box<Expression>, Box<Expression>),
+    Block(Vec<Box<Statement>>),
     Expression(Box<Expression>),
     Return(Option<Box<Expression>>),
     IfElse(Box<Expression>, Block, Option<Block>),
@@ -81,4 +81,5 @@ pub enum Statement {
         Block,
     ),
     StructDeclaration(Identifier, Option<Vec<Identifier>>, Vec<Param>),
+    Variable(Identifier, Box<Expression>),
 }
