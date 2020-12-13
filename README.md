@@ -3,6 +3,7 @@
 [![](https://meritbadge.herokuapp.com/rox-lang)](https://crates.io/crates/rox-lang)
 ![Build](https://github.com/reese/rox/workflows/Build/badge.svg)
 ![Security audit](https://github.com/reese/rox/workflows/Security%20audit/badge.svg)
+[![dependency status](https://deps.rs/repo/github/reese/rox/status.svg)](https://deps.rs/repo/github/reese/rox)
 
 ## Warning: Rox is still _very_ early in development and will likely change drastically in upcoming releases.
 
