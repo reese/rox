@@ -130,7 +130,25 @@ impl<'c> FunctionTranslator<'c> {
     pub fn translate_expression(&mut self, expression: &TaggedExpression) {
         use TaggedExpression::*;
         match expression {
-            Or(_, _) | And(_, _) | Access(_, _, _) => todo!(),
+            Access(_, _, _) => todo!(),
+            Or(left_expr, right_expr) => {
+                self.translate_expression(left_expr);
+                let else_jump = self.emit_jump(OpCode::JumpIfFalse);
+                let end_jump = self.emit_jump(OpCode::Jump);
+
+                self.patch_jump(else_jump);
+                self.chunk.write(OpCode::Pop);
+
+                self.translate_expression(right_expr);
+                self.patch_jump(end_jump);
+            }
+            And(left_expr, right_expr) => {
+                self.translate_expression(left_expr);
+                let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+                self.chunk.write(OpCode::Pop);
+                self.translate_expression(right_expr);
+                self.patch_jump(end_jump);
+            }
             Boolean(bool) => match bool {
                 true => self.chunk.write(OpCode::True),
                 false => self.chunk.write(OpCode::False),
