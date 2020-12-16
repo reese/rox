@@ -15,7 +15,7 @@ extern crate lalrpop_util;
 mod roxc;
 
 pub use crate::roxc::Result;
-use crate::roxc::{get_builtin_types, parse_file, Compiler};
+use crate::roxc::{parse_file, Compiler};
 use std::path::PathBuf;
 
 /// `run_file` reads the contents of the given path

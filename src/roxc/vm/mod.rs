@@ -8,7 +8,6 @@ use crate::roxc::stack::Stack;
 pub(crate) use crate::roxc::vm::opcode::OpCode;
 pub(crate) use crate::roxc::vm::value::Value;
 pub(crate) use chunk::Chunk;
-use std::hint::unreachable_unchecked;
 
 pub(crate) struct VM {
     chunk: Chunk,
@@ -147,7 +146,9 @@ impl VM {
                         _ => unreachable!(),
                     }
                 }
-                OpCode::Offset(offset) => unreachable!(),
+                OpCode::Offset(_offset) => unreachable!(
+                    "Offsets are only read in other OpCode implementations"
+                ),
             }
             instruction_pointer += 1;
         }

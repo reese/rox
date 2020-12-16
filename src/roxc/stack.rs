@@ -16,6 +16,7 @@ impl<T> Stack<T> {
         self.stack.pop()
     }
 
+    #[allow(dead_code)]
     pub fn top(&self) -> &T {
         self.stack.last().expect("No items on stack")
     }
