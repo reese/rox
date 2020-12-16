@@ -33,4 +33,6 @@ pub(crate) enum OpCode {
     Placeholder,
     JumpIfFalse,
     Jump,
+    Loop,
+    Offset(usize),
 }

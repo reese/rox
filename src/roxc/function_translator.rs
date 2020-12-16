@@ -107,14 +107,12 @@ impl<'c> FunctionTranslator<'c> {
             IfElse(conditional, if_statements, else_statements_maybe) => {
                 self.translate_expression(conditional);
                 let then_jump = self.emit_jump(OpCode::JumpIfFalse);
-                self.chunk.write(OpCode::Pop);
                 if_statements
                     .iter()
                     .map(|statement| self.translate_statement(statement))
                     .collect::<Result<Vec<_>>>()?;
                 let else_jump = self.emit_jump(OpCode::Jump);
                 self.patch_jump(then_jump);
-                self.chunk.write(OpCode::Pop);
                 if let Some(else_statements) = else_statements_maybe {
                     else_statements
                         .iter()
@@ -122,6 +120,19 @@ impl<'c> FunctionTranslator<'c> {
                         .collect::<Result<Vec<_>>>()?;
                 }
                 self.patch_jump(else_jump);
+                Ok(())
+            }
+            While(conditional, body) => {
+                let loop_start = self.chunk.opcodes.len();
+                self.translate_expression(conditional.as_ref());
+
+                let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+                body.iter()
+                    .map(|statement| self.translate_statement(statement))
+                    .collect::<Result<Vec<_>>>()?;
+                self.emit_loop(loop_start);
+                self.patch_jump(exit_jump);
+                self.chunk.write(OpCode::Pop);
                 Ok(())
             }
         }
@@ -213,13 +224,12 @@ impl<'c> FunctionTranslator<'c> {
         }
     }
 
-    fn resolve_local(&self, name: &String) -> usize {
+    fn resolve_local(&self, name: &str) -> usize {
         for (index, local) in self.locals.iter().rev().enumerate() {
-            if &local.name == name {
+            if local.name == name {
                 return index;
             }
         }
-
         unreachable!()
     }
 
@@ -229,8 +239,14 @@ impl<'c> FunctionTranslator<'c> {
         self.chunk.opcodes.len() - 1
     }
 
+    fn emit_loop(&mut self, loop_start: usize) {
+        self.chunk.write(OpCode::Loop);
+        let offset = self.chunk.opcodes.len() - loop_start + 1;
+        self.chunk.write(OpCode::Offset(offset));
+    }
+
     fn patch_jump(&mut self, offset: usize) {
         let jump = self.chunk.opcodes.len() - offset - 1;
-        self.chunk.opcodes[offset] = OpCode::Constant(jump);
+        self.chunk.opcodes[offset] = OpCode::Offset(jump);
     }
 }

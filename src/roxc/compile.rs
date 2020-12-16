@@ -1,8 +1,6 @@
+use crate::roxc::function_translator::FunctionTranslator;
 use crate::roxc::vm::{Chunk, VM};
-use crate::roxc::{
-    analyse_program, FunctionTranslator, Identifier, Result, RoxError, Stack,
-    Statement, TaggedStatement, Type,
-};
+use crate::roxc::{analyse_program, Result, Statement};
 use std::path::PathBuf;
 
 pub struct Compiler {

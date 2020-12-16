@@ -29,6 +29,7 @@ Statement: Box<Statement> = {
     StructDeclaration,
     Assignment,
     "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
+    "while" <Expression> <Block> => Box::new(Statement::While(<>)),
 }
 
 Assignment: Box<Statement> = {

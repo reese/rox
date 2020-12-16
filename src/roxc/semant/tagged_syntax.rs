@@ -69,4 +69,5 @@ pub(crate) enum TaggedStatement {
     IfElse(Box<TaggedExpression>, TaggedBlock, Option<TaggedBlock>),
     Return(Option<TaggedExpression>),
     Variable(Identifier, Box<TaggedExpression>, Box<Type>),
+    While(Box<TaggedExpression>, Vec<TaggedStatement>),
 }

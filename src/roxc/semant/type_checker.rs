@@ -478,6 +478,28 @@ fn translate_statement(
                 Ok(TaggedStatement::IfElse(tagged_if, tagged_body, None))
             }
         }
+        Statement::While(conditional, body) => {
+            let tagged_if = Box::new(translate_expression(
+                type_env,
+                variable_env,
+                conditional.as_ref().clone(),
+            )?);
+            unify(
+                tagged_if.as_ref().clone().into(),
+                Type::Apply(TypeConstructor::Bool, Vec::new()),
+            )?;
+            let tagged_body = body
+                .iter()
+                .map(|s| {
+                    translate_statement(
+                        type_env,
+                        variable_env,
+                        s.as_ref().clone(),
+                    )
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(TaggedStatement::While(tagged_if, tagged_body))
+        }
     }
 }
 

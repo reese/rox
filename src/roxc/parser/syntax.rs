@@ -82,4 +82,5 @@ pub enum Statement {
     ),
     StructDeclaration(Identifier, Option<Vec<Identifier>>, Vec<Param>),
     Variable(Identifier, Box<Expression>),
+    While(Box<Expression>, Vec<Box<Statement>>),
 }

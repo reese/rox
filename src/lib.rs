@@ -40,12 +40,16 @@ fn compile_file<T>(input_file: T, object_file_output: T)
 where
     T: Into<PathBuf> + Sized + Clone,
 {
-    let declarations = parse_file(input_file).unwrap();
+    let declarations_result = parse_file(input_file);
+    match declarations_result {
+        Err(e) => e.emit_error().unwrap(),
+        Ok(declarations) => {
+            // TODO: Clean this shit up
+            // let (_, _, function_stack) = get_builtin_types();
 
-    // TODO: Clean this shit up
-    // let (_, _, function_stack) = get_builtin_types();
-
-    let mut compiler = Compiler::new();
-    compiler.compile(declarations).unwrap();
-    compiler.finish(object_file_output);
+            let mut compiler = Compiler::new();
+            compiler.compile(declarations).unwrap();
+            compiler.finish(object_file_output);
+        }
+    }
 }

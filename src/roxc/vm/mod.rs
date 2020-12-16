@@ -4,10 +4,11 @@ pub(crate) mod opcode;
 pub(crate) mod value;
 
 use super::errors::Result;
+use crate::roxc::stack::Stack;
 pub(crate) use crate::roxc::vm::opcode::OpCode;
 pub(crate) use crate::roxc::vm::value::Value;
-use crate::roxc::Stack;
 pub(crate) use chunk::Chunk;
+use std::hint::unreachable_unchecked;
 
 pub(crate) struct VM {
     chunk: Chunk,
@@ -112,22 +113,41 @@ impl VM {
                 }
                 OpCode::AssignVariable(index) => {
                     // N.B. We might want to read, store, then pop in case of garbage collection
-                    self.stack.set(*index, self.stack.top().clone());
+                    let value = self.stack.pop().unwrap().clone();
+                    self.stack.set(*index, value);
                 }
                 OpCode::Placeholder => unreachable!(
                     "The jump offset placeholder was never replaced."
                 ),
                 OpCode::JumpIfFalse => {
                     let conditional = self.stack.pop().unwrap().read_bool();
-                    let offset = self.stack.pop().unwrap().read_number();
-                    if !conditional {
-                        instruction_pointer += offset
+                    instruction_pointer += 1;
+                    // Offset is in next instruction
+                    match self.chunk.opcodes[instruction_pointer] {
+                        OpCode::Offset(offset) => {
+                            if !conditional {
+                                instruction_pointer += offset
+                            }
+                        }
+                        _ => unreachable!(),
                     }
                 }
                 OpCode::Jump => {
-                    let offset = self.stack.pop().unwrap().read_number();
-                    instruction_pointer += offset;
+                    instruction_pointer += 1;
+                    match self.chunk.opcodes[instruction_pointer] {
+                        OpCode::Offset(offset) => instruction_pointer += offset,
+                        _ => unreachable!(),
+                    }
                 }
+                OpCode::Loop => {
+                    instruction_pointer += 1;
+
+                    match self.chunk.opcodes[instruction_pointer] {
+                        OpCode::Offset(offset) => instruction_pointer -= offset,
+                        _ => unreachable!(),
+                    }
+                }
+                OpCode::Offset(offset) => unreachable!(),
             }
             instruction_pointer += 1;
         }
