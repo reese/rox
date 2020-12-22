@@ -26,6 +26,8 @@ impl<'c> FunctionTranslator<'c> {
         &mut self,
         block: &[TaggedStatement],
     ) -> Result<()> {
+        // Claim an initial stack slot for the VM
+        self.locals.push(Local::new(String::new(), 0));
         block
             .iter()
             .map(|statement| self.translate_statement(statement))

@@ -32,7 +32,7 @@ enum Roxc {
 }
 
 /// # Rox
-/// This is the executable for running the Rox roxc.
+/// This is the executable for running the Rox compiler.
 fn main() {
     let args = Roxc::from_args();
     match args {

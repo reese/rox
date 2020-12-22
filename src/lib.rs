@@ -47,9 +47,9 @@ where
             // TODO: Clean this shit up
             // let (_, _, function_stack) = get_builtin_types();
 
-            let mut compiler = Compiler::new();
-            compiler.compile(declarations).unwrap();
-            compiler.finish(object_file_output);
+            let compiler = Compiler::new();
+            let func = compiler.compile(declarations).unwrap();
+            Compiler::finish(func, object_file_output);
         }
     }
 }

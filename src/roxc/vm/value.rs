@@ -52,6 +52,7 @@ impl Add for Value {
                     (Object::String(l), Object::String(r)) => Value::Obj(
                         Rc::new(Object::String(l.clone() + r.as_str())),
                     ),
+                    _ => unreachable!(),
                 }
             }
             _ => unreachable!(),

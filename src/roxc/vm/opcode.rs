@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub(crate) enum OpCode {
     Return,
     /// A literal value.

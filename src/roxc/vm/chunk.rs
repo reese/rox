@@ -1,7 +1,7 @@
 use super::opcode::OpCode;
 use super::value::Value;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub(crate) struct Chunk {
     pub(crate) opcodes: Vec<OpCode>,
     pub(crate) constants: Vec<Value>,
