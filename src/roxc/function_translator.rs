@@ -1,9 +1,13 @@
 use crate::roxc::local::Local;
+use crate::roxc::vm::function::Function;
+use crate::roxc::vm::object::Object;
 use crate::roxc::vm::{Chunk, OpCode, Value};
 use crate::roxc::{parser, Result, RoxError};
 use crate::roxc::{TaggedExpression, TaggedStatement};
+use std::rc::Rc;
 
 pub(crate) struct FunctionTranslator<'c> {
+    enclosing_function: Option<&'c FunctionTranslator<'c>>,
     chunk: &'c mut Chunk,
     locals: Vec<Local>,
     scope_depth: i32,
@@ -16,23 +20,38 @@ impl<'c> FunctionTranslator<'c> {
         scope_depth: i32,
     ) -> Self {
         FunctionTranslator {
+            enclosing_function: None,
             chunk,
             locals,
             scope_depth,
         }
     }
 
-    pub(crate) fn translate_function(
-        &mut self,
+    pub(crate) fn new_local_function(
+        chunk: &'c mut Chunk,
+        locals: Vec<Local>,
+        scope_depth: i32,
+        enclosing_function: &'c FunctionTranslator<'c>,
+    ) -> Self {
+        FunctionTranslator {
+            chunk,
+            locals,
+            scope_depth,
+            enclosing_function: Some(enclosing_function),
+        }
+    }
+
+    pub(crate) fn translate_statements(
+        mut self,
         block: &[TaggedStatement],
-    ) -> Result<()> {
+    ) -> Result<&'c mut Chunk> {
         // Claim an initial stack slot for the VM
         self.locals.push(Local::new(String::new(), 0));
         block
             .iter()
             .map(|statement| self.translate_statement(statement))
             .collect::<Result<Vec<_>>>()?;
-        Ok(())
+        Ok(self.chunk)
     }
 
     fn translate_statement(
@@ -85,8 +104,34 @@ impl<'c> FunctionTranslator<'c> {
                 self.chunk.write(OpCode::Pop);
                 Ok(())
             }
-            FunctionDeclaration(..) => todo!(),
-            // TODO: Do we need external functions like this
+            FunctionDeclaration(declaration, block) => {
+                self.start_scope();
+                declaration.params.iter().for_each(|(param, _)| {
+                    self.locals
+                        .push(Local::new(param.to_string(), self.scope_depth))
+                });
+                let mut new_chunk = Chunk::new();
+                let translator = FunctionTranslator::new_local_function(
+                    &mut new_chunk,
+                    self.locals.to_vec(),
+                    self.scope_depth + 1,
+                    &self,
+                );
+                translator.translate_statements(block)?;
+                let arity = declaration.params.len() as u8;
+                let new_function =
+                    Function::new(arity, new_chunk, declaration.name.clone());
+                self.end_scope();
+                self.chunk.add_constant(Value::Obj(Rc::new(Object::Function(
+                    new_function,
+                ))));
+                self.locals.push(Local::new(
+                    declaration.name.clone(),
+                    self.scope_depth,
+                ));
+                Ok(())
+            }
+            // TODO: Do we need external functions like this?
             // if it's in a VM? I think we can provide all of that
             // directly from Rust.
             //
@@ -100,8 +145,15 @@ impl<'c> FunctionTranslator<'c> {
                 // self.functions.insert(decl.name.clone(), decl.clone());
             }
             Return(maybe_expression) => {
+                if self.scope_depth == 0 {
+                    return Err(RoxError::with_file_placeholder(
+                        "Cannot return from top-level.",
+                    ));
+                }
                 if let Some(expr) = maybe_expression.as_ref() {
                     self.translate_expression(expr)
+                } else {
+                    self.chunk.add_constant(Value::Unit)
                 }
                 self.chunk.write(OpCode::Return);
                 Ok(())
@@ -166,7 +218,10 @@ impl<'c> FunctionTranslator<'c> {
                 true => self.chunk.write(OpCode::True),
                 false => self.chunk.write(OpCode::False),
             },
-            FunctionCall(_function_name, _args, _rox_type) => todo!(),
+            FunctionCall(_function_name, args, _rox_type) => {
+                args.iter().for_each(|arg| self.translate_expression(arg));
+                self.chunk.write(OpCode::Call(args.len()));
+            }
             Array(_tagged_expressions, _type_) => todo!(),
             // TODO: escape characters, template strings
             String(string) => {

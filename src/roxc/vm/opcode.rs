@@ -35,4 +35,7 @@ pub(crate) enum OpCode {
     Jump,
     Loop,
     Offset(usize),
+
+    /* Function Calls */
+    Call(usize),
 }

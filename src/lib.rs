@@ -20,13 +20,6 @@ use std::path::PathBuf;
 
 /// `run_file` reads the contents of the given path
 /// and runs them through the roxc.
-///
-/// # Errors
-/// Currently, the Rox roxc exits with a
-/// `1` error code if it fails to compile. In the future,
-/// it would likely be a good idea to refactor these
-/// to have POSIX compliant error codes, or at least
-/// some consistent error code system.
 pub fn build_file(path: PathBuf, output: PathBuf) {
     build_source_string(output, path);
 }

@@ -3,7 +3,7 @@ use crate::roxc::vm::Chunk;
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub(crate) struct Function {
     arity: u8,
-    chunk: Chunk,
+    pub(crate) chunk: Chunk,
     name: String,
 }
 

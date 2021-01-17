@@ -1,9 +1,11 @@
+use crate::roxc::vm::function::Function;
 use crate::roxc::vm::object::Object;
-use std::ops::{Add, Div, Mul, Not, Sub};
+use std::ops::{Add, Deref, Div, Mul, Not, Sub};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub(crate) enum Value {
+    Unit,
     Bool(bool),
     Number(f64),
     Obj(Rc<Object>),
@@ -21,6 +23,17 @@ impl Value {
             unreachable!("Encountered unexpected value: {:?}", self);
         }
     }
+
+    pub(crate) fn read_function(&self) -> &Function {
+        if let Value::Obj(func_object) = self {
+            match func_object.deref() {
+                Object::Function(func) => func,
+                _ => unreachable!("A Function was expected"),
+            }
+        } else {
+            unreachable!("Encountered unexpected value: {:?}", self);
+        }
+    }
 }
 
 impl Mul for Value {
@@ -31,10 +44,10 @@ impl Mul for Value {
             if let Value::Number(right) = rhs {
                 Value::Number(left * right)
             } else {
-                unreachable!()
+                unreachable!("Right side of multiplication was not a number")
             }
         } else {
-            unreachable!()
+            unreachable!("Left side of multiplication was not a number.")
         }
     }
 }

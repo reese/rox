@@ -8,6 +8,10 @@ impl<T> Stack<T> {
         Stack { stack: Vec::new() }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
     pub fn push(&mut self, item: T) {
         self.stack.push(item);
     }

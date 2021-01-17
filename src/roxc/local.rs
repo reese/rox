@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub(crate) struct Local {
     pub(crate) name: String,
     pub(crate) depth: i32,

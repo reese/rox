@@ -38,12 +38,12 @@ impl Compiler {
         declarations: &[Box<Statement>],
     ) -> Result<()> {
         let tagged_statements = analyse_program(declarations.to_vec())?;
-        let mut translator = FunctionTranslator::new(
+        let translator = FunctionTranslator::new(
             self.function.get_mut_chunk(),
             Vec::new(),
             0,
         );
-        translator.translate_function(tagged_statements.as_slice())?;
+        translator.translate_statements(tagged_statements.as_slice())?;
         Ok(())
     }
 }
