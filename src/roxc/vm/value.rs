@@ -1,19 +1,24 @@
 use crate::roxc::vm::function::Function;
-use crate::roxc::vm::object::Object;
-use std::ops::{Add, Deref, Div, Mul, Not, Sub};
-use std::rc::Rc;
+use std::{
+    borrow::Cow,
+    ops::{Add, Div, Mul, Not, Sub},
+};
+
+use super::native_function::NativeFuncHolder;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub(crate) enum Value {
     Unit,
     Bool(bool),
     Number(f64),
-    Obj(Rc<Object>),
+    String(Cow<'static, str>),
+    Function(Function),
+    NativeFunction(NativeFuncHolder),
 }
 
 impl Value {
     pub(crate) fn create_string(str: String) -> Self {
-        Value::Obj(Rc::new(Object::String(str)))
+        Value::String(Cow::Owned(str))
     }
 
     pub(crate) fn read_bool(&self) -> bool {
@@ -24,12 +29,17 @@ impl Value {
         }
     }
 
-    pub(crate) fn read_function(&self) -> &Function {
-        if let Value::Obj(func_object) = self {
-            match func_object.deref() {
-                Object::Function(func) => func,
-                _ => unreachable!("A Function was expected"),
-            }
+    pub(crate) fn read_string(&self) -> Cow<'static, str> {
+        if let Value::String(string) = self {
+            string.clone()
+        } else {
+            unreachable!("Encountered unexpected value: {:?}", self);
+        }
+    }
+
+    pub(crate) fn read_number(&self) -> f64 {
+        if let Value::Number(number) = self {
+            *number
         } else {
             unreachable!("Encountered unexpected value: {:?}", self);
         }
@@ -60,15 +70,13 @@ impl Add for Value {
             (Value::Number(left), Value::Number(right)) => {
                 Value::Number(left + right)
             }
-            (Value::Obj(left), Value::Obj(right)) => {
-                match (left.as_ref(), right.as_ref()) {
-                    (Object::String(l), Object::String(r)) => Value::Obj(
-                        Rc::new(Object::String(l.clone() + r.as_str())),
-                    ),
-                    _ => unreachable!(),
-                }
+            (Value::String(left), Value::String(right)) => {
+                Value::String(left + right)
             }
-            _ => unreachable!(),
+            (left, right) => panic!(
+                "Expected string or number values, got {:?} and {:?}",
+                left, right
+            ),
         }
     }
 }

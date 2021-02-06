@@ -19,9 +19,6 @@ enum Roxc {
         /// The name of the output executable
         #[structopt(short, long)]
         output: PathBuf,
-        /// Option to not link the native object file
-        #[structopt(short, long)]
-        no_link: bool,
     },
     /// Executes the program with Rox's JIT compiler
     Run {
@@ -37,6 +34,6 @@ fn main() {
     let args = Roxc::from_args();
     match args {
         Roxc::Build { file, output, .. } => build_file(file, output),
-        _ => todo!("The JIT compiler for this hasn't been built yet. Instead, use the `build` command and run the executable."),
+        Roxc::Run { file } => build_file(file, PathBuf::new()),
     };
 }

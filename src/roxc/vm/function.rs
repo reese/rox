@@ -4,7 +4,7 @@ use crate::roxc::vm::Chunk;
 pub(crate) struct Function {
     arity: u8,
     pub(crate) chunk: Chunk,
-    name: String,
+    pub(crate) name: String,
 }
 
 impl Function {
@@ -26,9 +26,5 @@ impl Function {
 
     pub(crate) fn get_mut_chunk(&mut self) -> &mut Chunk {
         &mut self.chunk
-    }
-
-    pub(crate) fn finish_chunk(self) -> Chunk {
-        self.chunk
     }
 }

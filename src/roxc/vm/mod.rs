@@ -2,9 +2,11 @@ mod call_frame;
 mod call_stack;
 pub(crate) mod chunk;
 pub(crate) mod function;
-pub(crate) mod object;
+pub(crate) mod native_function;
 pub(crate) mod opcode;
 pub(crate) mod value;
+
+use std::unreachable;
 
 use super::errors::Result;
 use crate::roxc::stack::Stack;
@@ -36,6 +38,7 @@ impl VM {
             slots_start_offset: 0,
         };
         self.frames.push(frame);
+        println!("op codes: {:?}", self.frames.top().get_chunk().opcodes);
         while self.get_instruction_pointer() < self.get_chunk_ip_length() {
             let ip = self.get_current_instruction();
             match ip {
@@ -47,68 +50,87 @@ impl VM {
                         return Ok(());
                     }
 
-                    self.stack.push(result)
+                    self.stack.push(result);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Constant(index) => {
-                    let constant = self.get_constant(index);
-                    self.push(constant.clone())
+                    let constant = self.get_constant(index).clone();
+                    self.push(constant);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Negate => {
                     let val = self.stack.pop();
                     self.stack.push(val * Value::Number(-1.0));
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Add => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(left + right);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Subtract => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(left - right);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Multiply => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(left * right);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Divide => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(left / right);
+                    self.advance_instruction_pointer()
                 }
-                OpCode::True => self.push(Value::Bool(true)),
-                OpCode::False => self.push(Value::Bool(false)),
+                OpCode::True => {
+                    self.push(Value::Bool(true));
+                    self.advance_instruction_pointer()
+                }
+                OpCode::False => {
+                    self.push(Value::Bool(false));
+                    self.advance_instruction_pointer()
+                }
                 OpCode::Not => {
                     let val = self.pop();
                     self.push(!val);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Equal => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(Value::Bool(left == right));
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Greater => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(Value::Bool(left > right));
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Less => {
-                    println!("{:?}", self.stack);
                     let right = self.pop();
                     let left = self.pop();
                     self.push(Value::Bool(left < right));
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Pop => {
                     self.pop();
+                    self.advance_instruction_pointer()
                 }
                 OpCode::ReadVariable(index) => {
                     self.push(self.read_slot(index));
+                    self.advance_instruction_pointer()
                 }
                 OpCode::AssignVariable(index) => {
                     // N.B. We might want to read, store, then pop in case of garbage collection
                     let value = self.pop().clone();
                     self.set_slot(index, value);
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Placeholder => unreachable!(
                     "The jump offset placeholder was never replaced."
@@ -127,6 +149,7 @@ impl VM {
                         }
                         _ => unreachable!(),
                     }
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Jump => {
                     self.advance_instruction_pointer();
@@ -136,6 +159,7 @@ impl VM {
                         }
                         _ => unreachable!(),
                     }
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Loop => {
                     self.advance_instruction_pointer();
@@ -146,24 +170,40 @@ impl VM {
                         }
                         _ => unreachable!(),
                     }
+                    self.advance_instruction_pointer()
                 }
                 OpCode::Offset(_offset) => unreachable!(
                     "Offsets are only read in other OpCode implementations"
                 ),
                 OpCode::Call(arg_count) => {
-                    let func_value = self.read_slot(arg_count);
-                    let function = func_value.read_function().clone();
-                    let index_to_borrow_after =
-                        self.stack.len() - arg_count - 1;
-                    let frame = CallFrame {
-                        function,
-                        instruction_pointer: self.get_instruction_pointer(),
-                        slots_start_offset: index_to_borrow_after,
-                    };
-                    self.frames.push(frame)
+                    let func_value = self.read_back(arg_count);
+
+                    match func_value {
+                        Value::Function(function) => {
+                            let index_to_borrow_after =
+                                self.stack.len() - arg_count - 1;
+                            let frame = CallFrame {
+                                function,
+                                instruction_pointer: 0,
+                                slots_start_offset: index_to_borrow_after,
+                            };
+                            self.frames.push(frame);
+                        }
+                        Value::NativeFunction(native_func) => {
+                            let args = (0..(arg_count + 1))
+                                .map(|_| self.pop())
+                                .collect();
+                            self.push(
+                                native_func.call(args).unwrap_or(Value::Unit),
+                            );
+                            self.advance_instruction_pointer()
+                        }
+                        _ => {
+                            unreachable!("Attempted to call non-function value")
+                        }
+                    }
                 }
             }
-            self.advance_instruction_pointer();
         }
         Ok(())
     }
@@ -211,7 +251,14 @@ impl VM {
     }
 
     fn read_slot(&self, index: usize) -> Value {
-        self.stack.get(self.frames.top().slots_start_offset + index)
+        println!("stack: {:?}", self.stack);
+        self.stack
+            .get(dbg!(self.frames.top().slots_start_offset + dbg!(index)))
+    }
+
+    /// Reads the opcode several
+    fn read_back(&self, backwards_offset: usize) -> Value {
+        self.stack.get_from_end(backwards_offset)
     }
 
     fn set_slot(&mut self, index: usize, value: Value) {

@@ -37,9 +37,6 @@ where
     match declarations_result {
         Err(e) => e.emit_error().unwrap(),
         Ok(declarations) => {
-            // TODO: Clean this shit up
-            // let (_, _, function_stack) = get_builtin_types();
-
             let compiler = Compiler::new();
             let func = compiler.compile(declarations).unwrap();
             Compiler::finish(func, object_file_output);

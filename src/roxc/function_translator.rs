@@ -1,13 +1,11 @@
 use crate::roxc::local::Local;
 use crate::roxc::vm::function::Function;
-use crate::roxc::vm::object::Object;
 use crate::roxc::vm::{Chunk, OpCode, Value};
 use crate::roxc::{parser, Result, RoxError};
 use crate::roxc::{TaggedExpression, TaggedStatement};
-use std::rc::Rc;
+use std::todo;
 
 pub(crate) struct FunctionTranslator<'c> {
-    enclosing_function: Option<&'c FunctionTranslator<'c>>,
     chunk: &'c mut Chunk,
     locals: Vec<Local>,
     scope_depth: i32,
@@ -20,7 +18,6 @@ impl<'c> FunctionTranslator<'c> {
         scope_depth: i32,
     ) -> Self {
         FunctionTranslator {
-            enclosing_function: None,
             chunk,
             locals,
             scope_depth,
@@ -31,13 +28,11 @@ impl<'c> FunctionTranslator<'c> {
         chunk: &'c mut Chunk,
         locals: Vec<Local>,
         scope_depth: i32,
-        enclosing_function: &'c FunctionTranslator<'c>,
     ) -> Self {
         FunctionTranslator {
             chunk,
             locals,
             scope_depth,
-            enclosing_function: Some(enclosing_function),
         }
     }
 
@@ -46,7 +41,7 @@ impl<'c> FunctionTranslator<'c> {
         block: &[TaggedStatement],
     ) -> Result<&'c mut Chunk> {
         // Claim an initial stack slot for the VM
-        self.locals.push(Local::new(String::new(), 0));
+        // self.locals.push(Local::new(String::new(), 0));
         block
             .iter()
             .map(|statement| self.translate_statement(statement))
@@ -115,35 +110,23 @@ impl<'c> FunctionTranslator<'c> {
                     &mut new_chunk,
                     self.locals.to_vec(),
                     self.scope_depth + 1,
-                    &self,
                 );
                 translator.translate_statements(block)?;
                 let arity = declaration.params.len() as u8;
                 let new_function =
                     Function::new(arity, new_chunk, declaration.name.clone());
                 self.end_scope();
-                self.chunk.add_constant(Value::Obj(Rc::new(Object::Function(
-                    new_function,
-                ))));
+                self.chunk.add_constant(Value::Function(new_function));
                 self.locals.push(Local::new(
                     declaration.name.clone(),
                     self.scope_depth,
                 ));
                 Ok(())
             }
-            // TODO: Do we need external functions like this?
-            // if it's in a VM? I think we can provide all of that
-            // directly from Rust.
-            //
-            // The `extern` tag merely declares the function to the type checker
-            // The linker will then try to dynamically link the function call
-            // if one exists. For the most part, we use this as a way to use
-            // `libc` functions, but this could potentially be used to link a
-            // Rust runtime library, but that's still undetermined.
-            ExternFunctionDeclaration(_decl) => {
-                todo!()
-                // self.functions.insert(decl.name.clone(), decl.clone());
-            }
+            // The `extern` tag merely declares the function to the type checker.
+            // Because it doesn't actually _do_ anything, we just continue
+            // on when we encounter it.
+            ExternFunctionDeclaration(_decl) => Ok(()),
             Return(maybe_expression) => {
                 if self.scope_depth == 0 {
                     return Err(RoxError::with_file_placeholder(
@@ -218,7 +201,10 @@ impl<'c> FunctionTranslator<'c> {
                 true => self.chunk.write(OpCode::True),
                 false => self.chunk.write(OpCode::False),
             },
-            FunctionCall(_function_name, args, _rox_type) => {
+            FunctionCall(function_name, args, _rox_type) => {
+                self.chunk.write(OpCode::ReadVariable(
+                    self.resolve_local(function_name),
+                ));
                 args.iter().for_each(|arg| self.translate_expression(arg));
                 self.chunk.write(OpCode::Call(args.len()));
             }
@@ -275,7 +261,7 @@ impl<'c> FunctionTranslator<'c> {
         while !self.locals.is_empty()
             && self.locals[index].depth > self.scope_depth
         {
-            self.chunk.write(OpCode::Pop);
+            // self.chunk.write(OpCode::Pop);
             self.locals.pop();
             index -= 1;
         }
@@ -284,7 +270,7 @@ impl<'c> FunctionTranslator<'c> {
     fn resolve_local(&self, name: &str) -> usize {
         for (index, local) in self.locals.iter().rev().enumerate() {
             if local.name == name {
-                return index;
+                return self.locals.len() - 1 - index; // since locals is reversed, `index` is the distance from the end
             }
         }
         unreachable!()

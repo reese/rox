@@ -14,6 +14,15 @@ impl CallStack {
         }
     }
 
+    pub(crate) fn get_from_end(&self, backwards_offset: usize) -> Value {
+        let end = self.stack.borrow().len() - 1;
+        self.stack
+            .borrow()
+            .get(end - backwards_offset)
+            .unwrap()
+            .clone()
+    }
+
     pub(crate) fn get(&self, index: usize) -> Value {
         self.stack.borrow().get(index).unwrap().clone()
     }
