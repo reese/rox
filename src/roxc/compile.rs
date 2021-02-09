@@ -145,6 +145,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
                     self.function_pass_manager.run_on(&fn_value);
                     Ok(())
                 } else {
+                    fn_value.print_to_stderr();
                     Err(RoxError::with_file_placeholder(
                         "Invalid generated function",
                     ))
@@ -155,7 +156,13 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
             // and we'll later use the field order of the type
             // to instantiate the struct.
             TaggedStatement::StructDeclaration => Ok(()),
-            _ => unreachable!(),
+            TaggedStatement::Expression(_)
+            | TaggedStatement::IfElse(_, _, _)
+            | TaggedStatement::Return(_) => {
+                Err(RoxError::with_file_placeholder(
+                    "Cannot use expression at the top level",
+                ))
+            }
         }
     }
 
