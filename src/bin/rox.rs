@@ -4,8 +4,8 @@
 //! This module is the executable module for the Rox roxc.
 extern crate rox;
 
-use rox::build_file;
-use std::path::PathBuf;
+use rox::{build_file, run_file};
+use std::{path::PathBuf, process::exit};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -35,8 +35,9 @@ enum Roxc {
 /// This is the executable for running the Rox roxc.
 fn main() {
     let args = Roxc::from_args();
-    match args {
+    let exit_status = match args {
         Roxc::Build { file, output, .. } => build_file(file, output),
-        _ => todo!("The JIT compiler for this hasn't been built yet. Instead, use the `build` command and run the executable."),
+        Roxc::Run { file } => run_file(file),
     };
+    exit(exit_status.code().unwrap_or(0));
 }
