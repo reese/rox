@@ -12,8 +12,12 @@ pub(crate) fn get_builtin_types() -> (
     let variable_env = HashMap::new();
 
     type_env.insert(
-        "Number".to_string(),
-        TypeValue::from(&Type::Apply(TypeConstructor::Number, Vec::new())),
+        "Int".to_string(),
+        TypeValue::from(&Type::Apply(TypeConstructor::Int, Vec::new())),
+    );
+    type_env.insert(
+        "Float".to_string(),
+        TypeValue::from(&Type::Apply(TypeConstructor::Float, Vec::new())),
     );
     type_env.insert(
         "String".to_string(),

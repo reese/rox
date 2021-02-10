@@ -59,7 +59,7 @@ impl RoxError {
             >,
         >,
         file: T,
-    ) -> Result<Self> {
+    ) -> Self {
         let rox_errors: Vec<RoxError> = error_vec
             .iter()
             .map(|ErrorRecovery { error, .. }| {
@@ -70,7 +70,7 @@ impl RoxError {
             .iter()
             .flat_map(|RoxError { labels, .. }| labels.clone())
             .collect::<Vec<_>>();
-        Ok(RoxError {
+        RoxError {
             file: SimpleFile::new(
                 file.clone().into().to_str().unwrap().to_string(),
                 read_to_string(file.into()).unwrap(),
@@ -80,7 +80,7 @@ impl RoxError {
             )),
             notes: vec![],
             labels,
-        })
+        }
     }
 
     pub fn from_parse_error(

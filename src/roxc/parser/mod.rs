@@ -19,8 +19,7 @@ pub fn parse_string(source: &str) -> Result<Vec<Box<Statement>>> {
         error_vec => Err(RoxError::from_error_recoveries(
             error_vec,
             PathBuf::from("./scratch/test.rox"),
-        )
-        .unwrap()),
+        )),
     }
 }
 

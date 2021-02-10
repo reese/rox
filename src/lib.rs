@@ -45,7 +45,13 @@ where
     T: Into<PathBuf> + Sized + Clone,
 {
     let module = context.create_module("rox");
-    let declarations = parse_file(input_file).unwrap();
+    let declarations = match parse_file(input_file) {
+        Ok(decl) => decl,
+        Err(error) => {
+            error.emit_error().unwrap();
+            return;
+        }
+    };
 
     // TODO: Clean this shit up
     let mut environment_stack = Stack::new();

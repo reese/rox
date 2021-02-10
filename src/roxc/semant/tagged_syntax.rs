@@ -19,8 +19,14 @@ pub enum TaggedExpression {
     #[allow(clippy::vec_box)]
     FunctionCall(Identifier, Vec<TaggedExpression>, Box<Type>),
     Identifier(Identifier, Box<Type>),
-    Number(f64),
-    Operation(Box<TaggedExpression>, Operation, Box<TaggedExpression>),
+    Float(f64),
+    Int(i32),
+    Operation(
+        Box<TaggedExpression>,
+        Operation,
+        Box<TaggedExpression>,
+        Box<Type>,
+    ),
     Or(Box<TaggedExpression>, Box<TaggedExpression>),
     String(String),
     StructInstantiation(Box<Type>, Vec<(Identifier, Box<TaggedExpression>)>),
@@ -41,16 +47,17 @@ impl Into<semant::Type> for TaggedExpression {
             And(_, _) | Boolean(_) => {
                 Type::Apply(TypeConstructor::Bool, Vec::new())
             }
-            Number(_) => Type::Apply(TypeConstructor::Number, Vec::new()),
+            Float(_) => Type::Apply(TypeConstructor::Float, Vec::new()),
+            Int(_) => Type::Apply(TypeConstructor::Int, Vec::new()),
             String(_) => Type::Apply(TypeConstructor::String, Vec::new()),
-            Operation(_, operation, _) => {
+            Operation(_, operation, _, _) => {
                 use parser::Operation::*;
                 match operation {
                     Equals | NotEquals | GreaterThan | LessThan => {
                         Type::Apply(TypeConstructor::Bool, Vec::new())
                     }
                     Add | Subtract | Multiply | Divide => {
-                        Type::Apply(TypeConstructor::Number, Vec::new())
+                        Type::Apply(TypeConstructor::Float, Vec::new())
                     }
                 }
             }

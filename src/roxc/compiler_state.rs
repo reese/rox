@@ -1,6 +1,4 @@
 use crate::roxc::{Identifier, Operation, Type};
-use inkwell::basic_block::BasicBlock;
-use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::types::{BasicType, BasicTypeEnum};
@@ -8,8 +6,10 @@ use inkwell::values::{
     BasicValue, BasicValueEnum, FloatValue, FunctionValue, InstructionValue,
     PointerValue,
 };
+use inkwell::{basic_block::BasicBlock, values::IntValue};
+use inkwell::{builder::Builder, IntPredicate};
 use inkwell::{AddressSpace, FloatPredicate};
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 pub struct CompilerState<'f, 'c> {
     builder: Builder<'c>,
@@ -52,7 +52,8 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                 use super::semant::TypeConstructor::*;
                 match constructor {
                     Bool => Some(context.bool_type().into()),
-                    Number => Some(context.f64_type().into()),
+                    Float => Some(context.f64_type().into()),
+                    Int => Some(context.i32_type().into()),
                     String => Some(
                         context
                             .i8_type()
@@ -116,7 +117,14 @@ impl<'f, 'c> CompilerState<'f, 'c> {
             .into()
     }
 
-    pub fn number_literal(&self, num: f64) -> BasicValueEnum<'c> {
+    pub fn int_literal(&self, num: i32) -> BasicValueEnum<'c> {
+        self.context
+            .i32_type()
+            .const_int(num.try_into().unwrap(), false)
+            .into()
+    }
+
+    pub fn float_literal(&self, num: f64) -> BasicValueEnum<'c> {
         self.context.f64_type().const_float(num).into()
     }
 
@@ -143,7 +151,85 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         allocation
     }
 
-    pub fn build_operation(
+    pub fn build_int_operation(
+        &self,
+        lval: IntValue<'c>,
+        rval: IntValue<'c>,
+        operation: &Operation,
+    ) -> BasicValueEnum<'c> {
+        use Operation::*;
+        match operation {
+            Add => self.builder.build_int_add(lval, rval, "tmpadd").into(),
+            Subtract => self.builder.build_int_sub(lval, rval, "tmpsub").into(),
+            Multiply => self.builder.build_int_mul(lval, rval, "tmpmul").into(),
+            Divide => self
+                .builder
+                .build_int_signed_div(lval, rval, "tmpdiv")
+                .into(),
+            Equals => {
+                let comparison = self.builder.build_int_compare(
+                    IntPredicate::EQ,
+                    lval,
+                    rval,
+                    "tmpcmp",
+                );
+                self.builder
+                    .build_unsigned_int_to_float(
+                        comparison,
+                        self.context.f64_type(),
+                        "tmpbool",
+                    )
+                    .into()
+            }
+            NotEquals => {
+                let comparison = self.builder.build_int_compare(
+                    IntPredicate::NE,
+                    lval,
+                    rval,
+                    "tmpcmp",
+                );
+                self.builder
+                    .build_unsigned_int_to_float(
+                        comparison,
+                        self.context.f64_type(),
+                        "tmpbool",
+                    )
+                    .into()
+            }
+            GreaterThan => {
+                let comparison = self.builder.build_int_compare(
+                    IntPredicate::SGT,
+                    lval,
+                    rval,
+                    "tmpcmp",
+                );
+                self.builder
+                    .build_unsigned_int_to_float(
+                        comparison,
+                        self.context.f64_type(),
+                        "tmpbool",
+                    )
+                    .into()
+            }
+            LessThan => {
+                let comparison = self.builder.build_int_compare(
+                    IntPredicate::SLT,
+                    lval,
+                    rval,
+                    "tmpcmp",
+                );
+                self.builder
+                    .build_unsigned_int_to_float(
+                        comparison,
+                        self.context.f64_type(),
+                        "tmpbool",
+                    )
+                    .into()
+            }
+        }
+    }
+
+    pub fn build_float_operation(
         &self,
         lval: FloatValue<'c>,
         rval: FloatValue<'c>,

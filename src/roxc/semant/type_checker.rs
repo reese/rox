@@ -12,8 +12,8 @@
 //! This function has a list of formal arguments -- here, a single argument, `T` -- and a type
 //! constructor.
 //! When we eventually instantiate this type -- say, in some function that returns a
-//! `List<Number>` -- `substitute is responsible for replacing the type `T` of the type constructor
-//! with the concrete type that the user provides: `Number`
+//! `List<Float>` -- `substitute is responsible for replacing the type `T` of the type constructor
+//! with the concrete type that the user provides: `Float`
 //!
 //! ## Unify
 //!
@@ -642,12 +642,14 @@ fn translate_expression(
                 right.as_ref().clone(),
             )?;
             Ok(TaggedExpression::Operation(
-                Box::new(tagged_left),
+                Box::new(tagged_left.clone()),
                 operation,
                 Box::new(tagged_right),
+                Box::new(tagged_left.into()),
             ))
         }
-        Expression::Number(n) => Ok(TaggedExpression::Number(n)),
+        Expression::Float(n) => Ok(TaggedExpression::Float(n)),
+        Expression::Int(n) => Ok(TaggedExpression::Int(n)),
         Expression::StructInstantiation(
             identifier,
             maybe_generic_args,
@@ -765,7 +767,7 @@ fn translate_expression(
                 Unary::Negate => {
                     unify(
                         tagged_expression.clone().into(),
-                        Type::Apply(TypeConstructor::Number, Vec::new()),
+                        Type::Apply(TypeConstructor::Float, Vec::new()),
                     )?;
                 }
             }

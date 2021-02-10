@@ -8,6 +8,8 @@ use inkwell::values::{BasicValueEnum, PointerValue};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
+use super::{Type, TypeConstructor};
+
 pub struct FunctionTranslator<'func, 'context> {
     current_state: &'func CompilerState<'func, 'context>,
     pub variables: &'func mut HashMap<Identifier, PointerValue<'context>>,
@@ -124,8 +126,11 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     panic!("Attempted to build a function not in this module.")
                 }
             }
-            TaggedExpression::Number(num) => {
-                Some(self.current_state.number_literal(*num))
+            TaggedExpression::Int(number) => {
+                Some(self.current_state.int_literal(*number))
+            }
+            TaggedExpression::Float(num) => {
+                Some(self.current_state.float_literal(*num))
             }
             TaggedExpression::Array(tagged_expressions, type_) => {
                 let expression_values = tagged_expressions
@@ -166,21 +171,46 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     self.variables.get(name).expect("Variable not defined");
                 Some(self.current_state.load_variable(*variable, name))
             }
-            TaggedExpression::Operation(left, operation, right) => {
-                let lval = self
-                    .translate_expression(left)
-                    .expect("Cannot perform operation on void value")
-                    .into_float_value();
-                let rval = self
-                    .translate_expression(right)
-                    .expect("Cannot perform operation on void value")
-                    .into_float_value();
-                Some(self.current_state.build_operation(lval, rval, operation))
+            TaggedExpression::Operation(lval, operation, rval, rox_type) => {
+                let left = self
+                    .translate_expression(lval)
+                    .expect("Cannot perform operation on void value");
+                let right = self
+                    .translate_expression(rval)
+                    .expect("Cannot perform operation on void value");
+                match rox_type.as_ref() {
+                    Type::Apply(constructor, _) => {
+                        match constructor {
+                            TypeConstructor::Float => {
+                                let left = left.into_float_value();
+                                let right = right.into_float_value();
+                                Some(self.current_state.build_float_operation(
+                                    left, right, operation,
+                                ))
+                            }
+                            TypeConstructor::Int => {
+                                let left = left.into_int_value();
+                                let right = right.into_int_value();
+                                Some(self.current_state.build_int_operation(
+                                    left, right, operation,
+                                ))
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    Type::Variable(_) | Type::PolymorphicType(_, _) => {
+                        unreachable!()
+                    }
+                }
             }
             TaggedExpression::StructInstantiation(_struct_type, _fields) => {
                 todo!()
             }
-            x => unimplemented!("{:?}", x),
+            TaggedExpression::Access(_, _, _)
+            | TaggedExpression::And(_, _)
+            | TaggedExpression::Assignment(_, _, _)
+            | TaggedExpression::Or(_, _)
+            | TaggedExpression::Unary(_, _, _) => todo!(),
         }
     }
 }

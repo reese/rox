@@ -4,7 +4,8 @@ use crate::roxc::Identifier;
 #[allow(dead_code)]
 pub enum TypeConstructor {
     Bool,
-    Number,
+    Float,
+    Int,
     String,
     Void,
     Arrow,
