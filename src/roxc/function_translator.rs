@@ -71,7 +71,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             TaggedStatement::IfElse(
                 conditional,
                 if_statements,
-                else_statements_maybe
+                else_statements_maybe,
             ) => {
                 let if_block = self.current_state.append_basic_block("if");
                 let else_block = self.current_state.append_basic_block("else");
@@ -85,18 +85,18 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     conditional_value,
                     "ifcond",
                     if_block,
-                    else_block
+                    else_block,
                 );
 
                 self.read_into_block(
                     Some(if_statements.clone()),
                     if_block,
-                    merge_block
+                    merge_block,
                 );
                 self.read_into_block(
                     else_statements_maybe.clone(),
                     else_block,
-                    merge_block
+                    merge_block,
                 );
 
                 self.current_state.position_at_end(merge_block);
