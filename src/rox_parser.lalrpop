@@ -1,8 +1,13 @@
-use crate::roxc::{Block, Expression, Identifier, Operation, Param, TypeName, Statement, Unary};
+use crate::roxc::{Block, Expression, Identifier, Operation, Param, TypeName, Statement, Span, Spanned, Unary};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
+
+#[inline]
+Span<T>: Spanned<T> = {
+    <l: @L> <rule: T> <r: @R> => Spanned { value: rule, span: Span(l, r) }
+}
 
 pub Program: Vec<Box<Statement>> = {
     <(<Statement>)*>
@@ -42,7 +47,7 @@ Assignment: Box<Expression> = {
     // i.e. `some_call().attribute = 3;`
     <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
     "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
-    <Identifier><("::" "<" <Comma<Type>> ">")?> "{" <Comma<(<Identifier> ":" <Expression>)>> "}" => Box::new(Expression::StructInstantiation(<>)),
+    <Span<Identifier>><("::" "<" <Comma<Type>> ">")?> "{" <Comma<(<Identifier> ":" <Expression>)>> "}" => Box::new(Expression::StructInstantiation(<>)),
     LogicOr
 }
 
@@ -85,7 +90,7 @@ Unary: Box<Expression> = {
 };
 
 Call: Box<Expression> = {
-    <i: Identifier> <generics:( "::" "<" <Comma<Type>> ">")?> "(" <args: (Arguments)?> ")" =>
+    <i: Span<Identifier>> <generics:( "::" "<" <Comma<Type>> ">")?> "(" <args: (Arguments)?> ")" =>
         Box::new(Expression::FunctionCall(i, generics.unwrap_or(Vec::new()), args.unwrap_or(Vec::new()))),
     Access,
     Primary
@@ -140,8 +145,8 @@ Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
     Float => Box::new(Expression::Float(<>)),
     Int => Box::new(Expression::Int(<>)),
-    String => Box::new(Expression::String(<>)),
-    Identifier => Box::new(Expression::Identifier(<>)),
+    Span<String> => Box::new(Expression::String(<>)),
+    Span<Identifier> => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
     "[" <Comma<Expression>> "]" => Box::new(Expression::Array(<>)),
     ! => {

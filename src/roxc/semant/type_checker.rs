@@ -619,11 +619,14 @@ fn translate_expression(
             x.clone(),
             Box::new(
                 variable_env
-                    .get(&x.clone())
+                    .get(&x.value)
                     .ok_or_else(|| {
                         RoxError::with_file_placeholder(
-                            format!("Encountered unknown identifier: {}", x)
-                                .as_ref(),
+                            format!(
+                                "Encountered unknown identifier: {}",
+                                x.value
+                            )
+                            .as_ref(),
                         )
                     })?
                     .clone(),
@@ -674,7 +677,8 @@ fn translate_expression(
                 Expression::Identifier(identifier.clone()),
             )?;
 
-            let struct_type = type_env.get(&identifier).unwrap().get_type();
+            let struct_type =
+                type_env.get(&identifier.value).unwrap().get_type();
 
             if let Type::PolymorphicType(generics, record_type_constructor) =
                 expand(tagged_struct_identifier.into())

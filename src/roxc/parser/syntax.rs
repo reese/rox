@@ -2,21 +2,34 @@
 use crate::roxc::semant;
 
 #[derive(Clone, Debug)]
+pub struct Span(pub usize, pub usize);
+
+#[derive(Clone, Debug)]
+pub struct Spanned<T> {
+    pub value: T,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug)]
 pub enum Expression {
     Access(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     Array(Vec<Box<Expression>>),
     Assignment(Box<Expression>, Box<Expression>),
     Boolean(bool),
-    FunctionCall(Identifier, Vec<Box<TypeName>>, Vec<Box<Expression>>),
-    Identifier(Identifier),
+    FunctionCall(
+        Spanned<Identifier>,
+        Vec<Box<TypeName>>,
+        Vec<Box<Expression>>,
+    ),
+    Identifier(Spanned<Identifier>),
     Float(f64),
     Int(i32),
     Operation(Box<Expression>, Operation, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
-    String(String),
+    String(Spanned<String>),
     StructInstantiation(
-        Identifier,
+        Spanned<Identifier>,
         Option<Vec<Box<TypeName>>>,
         Vec<(Identifier, Box<Expression>)>,
     ),

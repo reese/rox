@@ -1,4 +1,5 @@
 mod syntax;
+
 use crate::roxc::RoxError;
 use crate::Result;
 use std::fs::read_to_string;
@@ -7,27 +8,26 @@ pub use syntax::*;
 
 lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
 
-pub fn parse_string(source: &str) -> Result<Vec<Box<Statement>>> {
+pub fn parse_string(
+    source: &str,
+    path: &PathBuf,
+) -> Result<Vec<Box<Statement>>> {
     let mut errors = Vec::new();
     let declarations = rox_parser::ProgramParser::new()
         .parse(&mut errors, source)
-        .map_err(|e| {
-            RoxError::from_parse_error(&e, PathBuf::from("./scratch/test.rox"))
-        })?;
+        .map_err(|e| RoxError::from_parse_error(&e, path.clone()))?;
     match errors {
         empty_vec if empty_vec.is_empty() => Ok(declarations),
-        error_vec => Err(RoxError::from_error_recoveries(
-            error_vec,
-            PathBuf::from("./scratch/test.rox"),
-        )),
+        error_vec => Err(RoxError::from_error_recoveries(error_vec, path)),
     }
 }
 
 pub(crate) fn parse_file(
-    file: impl Into<PathBuf> + std::clone::Clone,
+    file: impl Into<PathBuf> + Clone,
 ) -> Result<Vec<Box<Statement>>> {
-    let source = read_to_string(file.into()).unwrap();
-    parse_string(&source)
+    let path_buf: &PathBuf = &file.into();
+    let source = read_to_string(path_buf).unwrap();
+    parse_string(&source, path_buf)
 }
 
 #[cfg(test)]
@@ -46,7 +46,7 @@ mod tests {
         end
         "#;
 
-        assert!(parse_string(source).is_ok());
+        assert!(parse_string(source, &PathBuf::new()).is_ok());
     }
 
     #[test]
@@ -61,7 +61,7 @@ mod tests {
         end
         "#;
 
-        assert!(parse_string(source).is_ok());
+        assert!(parse_string(source, &PathBuf::new()).is_ok());
     }
 
     #[test]
@@ -79,6 +79,6 @@ mod tests {
         end
         "#;
 
-        assert!(parse_string(source).is_ok());
+        assert!(parse_string(source, &PathBuf::new()).is_ok());
     }
 }

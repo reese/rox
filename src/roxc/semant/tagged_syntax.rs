@@ -7,6 +7,7 @@
 use crate::roxc::parser;
 use crate::roxc::semant::types::{Type, TypeConstructor};
 use crate::roxc::{semant, FunctionDeclaration, Identifier, Operation, Unary};
+use parser::Spanned;
 
 #[derive(Clone, Debug)]
 #[allow(clippy::vec_box, dead_code)]
@@ -16,9 +17,8 @@ pub enum TaggedExpression {
     Array(Vec<TaggedExpression>, Box<Type>),
     Assignment(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
     Boolean(bool),
-    #[allow(clippy::vec_box)]
-    FunctionCall(Identifier, Vec<TaggedExpression>, Box<Type>),
-    Identifier(Identifier, Box<Type>),
+    FunctionCall(Spanned<Identifier>, Vec<TaggedExpression>, Box<Type>),
+    Identifier(Spanned<Identifier>, Box<Type>),
     Float(f64),
     Int(i32),
     Operation(
@@ -28,13 +28,20 @@ pub enum TaggedExpression {
         Box<Type>,
     ),
     Or(Box<TaggedExpression>, Box<TaggedExpression>),
-    String(String),
+    String(Spanned<String>),
     StructInstantiation(Box<Type>, Vec<(Identifier, Box<TaggedExpression>)>),
     Unary(Unary, Box<TaggedExpression>, Box<Type>),
     Variable(Identifier, Box<TaggedExpression>, Box<Type>),
 }
 
+// This sucks - @reese
 impl Into<semant::Type> for TaggedExpression {
+    fn into(self) -> semant::Type {
+        (&self).into()
+    }
+}
+
+impl Into<semant::Type> for &TaggedExpression {
     fn into(self) -> semant::Type {
         use TaggedExpression::*;
         match self {

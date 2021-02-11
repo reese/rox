@@ -109,7 +109,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             }
             TaggedExpression::FunctionCall(function_name, args, _rox_type) => {
                 if let Some(function) =
-                    self.current_state.get_function(function_name)
+                    self.current_state.get_function(&function_name.value)
                 {
                     let argument_values: Vec<BasicValueEnum<'ctx>> = args
                         .iter()
@@ -156,7 +156,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 )
             }
             TaggedExpression::String(string) => {
-                Some(self.current_state.string_literal(string))
+                Some(self.current_state.string_literal(&string.value))
             }
             TaggedExpression::Variable(name, expression, _type_) => {
                 let value: BasicValueEnum<'ctx> = self
@@ -167,9 +167,11 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 Some(value)
             }
             TaggedExpression::Identifier(name, _rox_type) => {
-                let variable =
-                    self.variables.get(name).expect("Variable not defined");
-                Some(self.current_state.load_variable(*variable, name))
+                let variable = self
+                    .variables
+                    .get(&name.value)
+                    .expect("Variable not defined");
+                Some(self.current_state.load_variable(*variable, &name.value))
             }
             TaggedExpression::Operation(lval, operation, rval, rox_type) => {
                 let left = self
