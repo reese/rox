@@ -70,7 +70,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             }
             TaggedStatement::IfElse(
                 conditional,
-                if_statements
+                if_statements,
                 else_statements_maybe
             ) => {
                 let if_block = self.current_state.append_basic_block("if");
