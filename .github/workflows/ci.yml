@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1.0.0
+        uses: KyleMayes/install-llvm-action@latest
         with:
           version: "10.0"
           directory: ~/.clang
@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1.0.0
+        uses: KyleMayes/install-llvm-action@latest
         with:
           version: "10.0"
           directory: ~/.clang
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1.0.0
+        uses: KyleMayes/install-llvm-action@latest
         with:
           version: "10.0"
           directory: ~/.clang
