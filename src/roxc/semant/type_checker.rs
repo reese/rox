@@ -167,15 +167,15 @@ fn unify(type_one: Type, type_two: Type) -> Result<()> {
                     first_type_arguments
                         .iter()
                         .zip(second_type_arguments)
-                        .map(|(first, second)| unify(first.clone(), second))
-                        .collect()
+                        .try_for_each(|(first, second)| {
+                            unify(first.clone(), second)
+                        })
                 }
             }
             (_, _) => first_type_arguments
                 .iter()
                 .zip(second_type_arguments)
-                .map(|(first, second)| unify(first.clone(), second))
-                .collect(),
+                .try_for_each(|(first, second)| unify(first.clone(), second)),
         },
         (x, y) => Err(RoxError::with_file_placeholder(
             format!("Type mismatch: attempted to unify {:?} and {:?}", x, y)

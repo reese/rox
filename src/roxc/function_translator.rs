@@ -41,7 +41,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
 
     fn translate_statement(&mut self, statement: &TaggedStatement) {
         match statement.borrow() {
-            TaggedStatement::StructDeclaration => {},
+            TaggedStatement::StructDeclaration => {}
             TaggedStatement::Expression(expression) => {
                 self.translate_expression(expression);
             }
@@ -55,28 +55,49 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             // Rust runtime library, but that's still undetermined.
             TaggedStatement::ExternFunctionDeclaration(decl) => {
                 self.functions.insert(decl.name.clone(), decl.clone());
-            },
+            }
             TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
-                    if let Some(return_) = self.translate_expression(expression) {
+                    if let Some(return_) = self.translate_expression(expression)
+                    {
                         self.current_state.build_return(Some(&return_));
-                    }
-                    else {
+                    } else {
                         self.current_state.build_return(None);
                     }
                 } else {
                     self.current_state.build_return(None);
                 }
             }
-            TaggedStatement::IfElse(conditional, if_statements, else_statements_maybe) => {
+            TaggedStatement::IfElse(
+                conditional,
+                if_statements
+                else_statements_maybe
+            ) => {
                 let if_block = self.current_state.append_basic_block("if");
                 let else_block = self.current_state.append_basic_block("else");
-                let merge_block = self.current_state.append_basic_block("continue");
-                let conditional_value = self.translate_expression(conditional).expect("Cannot evaluate condition with void value").into_float_value();
-                self.current_state.build_conditional(conditional_value, "ifcond", if_block, else_block);
+                let merge_block =
+                    self.current_state.append_basic_block("continue");
+                let conditional_value = self
+                    .translate_expression(conditional)
+                    .expect("Cannot evaluate condition with void value")
+                    .into_float_value();
+                self.current_state.build_conditional(
+                    conditional_value,
+                    "ifcond",
+                    if_block,
+                    else_block
+                );
 
-                self.read_into_block(Some(if_statements.clone()), if_block, merge_block);
-                self.read_into_block(else_statements_maybe.clone(), else_block, merge_block);
+                self.read_into_block(
+                    Some(if_statements.clone()),
+                    if_block,
+                    merge_block
+                );
+                self.read_into_block(
+                    else_statements_maybe.clone(),
+                    else_block,
+                    merge_block
+                );
 
                 self.current_state.position_at_end(merge_block);
                 // N.B. I left out the `phi` value since I don't intend
