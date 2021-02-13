@@ -19,11 +19,11 @@ pub enum TaggedExpression {
     Boolean(bool),
     FunctionCall(Spanned<Identifier>, Vec<TaggedExpression>, Box<Type>),
     Identifier(Spanned<Identifier>, Box<Type>),
-    Float(f64),
-    Int(i32),
+    Float(Spanned<f64>),
+    Int(Spanned<i32>),
     Operation(
         Box<TaggedExpression>,
-        Operation,
+        Spanned<Operation>,
         Box<TaggedExpression>,
         Box<Type>,
     ),
@@ -31,7 +31,7 @@ pub enum TaggedExpression {
     String(Spanned<String>),
     StructInstantiation(Box<Type>, Vec<(Identifier, Box<TaggedExpression>)>),
     Unary(Unary, Box<TaggedExpression>, Box<Type>),
-    Variable(Identifier, Box<TaggedExpression>, Box<Type>),
+    Variable(Spanned<Identifier>, Box<TaggedExpression>, Box<Type>),
 }
 
 // This sucks - @reese
@@ -59,7 +59,7 @@ impl Into<semant::Type> for &TaggedExpression {
             String(_) => Type::Apply(TypeConstructor::String, Vec::new()),
             Operation(_, operation, _, _) => {
                 use parser::Operation::*;
-                match operation {
+                match operation.value {
                     Equals | NotEquals | GreaterThan | LessThan => {
                         Type::Apply(TypeConstructor::Bool, Vec::new())
                     }

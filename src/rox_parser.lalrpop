@@ -2,7 +2,7 @@ use crate::roxc::{Block, Expression, Identifier, Operation, Param, TypeName, Sta
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
-grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
+grammar<'err>(errors: &'err mut Vec<Spanned<ErrorRecovery<usize, Token<'input>, &'static str>>>);
 
 #[inline]
 Span<T>: Spanned<T> = {
@@ -46,7 +46,7 @@ Assignment: Box<Expression> = {
     // TODO: Allow for assignment to function results
     // i.e. `some_call().attribute = 3;`
     <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
-    "let" <Identifier> "=" <Assignment> => Box::new(Expression::Variable(<>)),
+    "let" <Span<Identifier>> "=" <Assignment> => Box::new(Expression::Variable(<>)),
     <Span<Identifier>><("::" "<" <Comma<Type>> ">")?> "{" <Comma<(<Identifier> ":" <Expression>)>> "}" => Box::new(Expression::StructInstantiation(<>)),
     LogicOr
 }
@@ -62,24 +62,24 @@ LogicAnd: Box<Expression> = {
 }
 
 Equality: Box<Expression> = {
-    Comparison EqualityOp Comparison => Box::new(Expression::Operation(<>)),
+    Comparison Span<EqualityOp> Comparison => Box::new(Expression::Operation(<>)),
     Comparison
 }
 
 Comparison: Box<Expression> = {
-    Addition ComparisonOp Addition => Box::new(Expression::Operation(<>)),
+    Addition Span<ComparisonOp> Addition => Box::new(Expression::Operation(<>)),
     Addition
 }
 
 // TODO: support multiple operators one after another
 // TODO: i.e. support `1 + 2 + 3`
 Addition: Box<Expression> = {
-    Multiplication AdditionOp Multiplication => Box::new(Expression::Operation(<>)),
+    Multiplication Span<AdditionOp> Multiplication => Box::new(Expression::Operation(<>)),
     Multiplication
 }
 
 Multiplication: Box<Expression> = {
-    Unary MultiplicationOp Unary => Box::new(Expression::Operation(<>)),
+    Unary Span<MultiplicationOp> Unary => Box::new(Expression::Operation(<>)),
     Unary
 }
 
@@ -143,13 +143,13 @@ AdditionOp: Operation = {
 
 Primary: Box<Expression> = {
     Boolean => Box::new(Expression::Boolean(<>)),
-    Float => Box::new(Expression::Float(<>)),
-    Int => Box::new(Expression::Int(<>)),
+    Span<Float> => Box::new(Expression::Float(<>)),
+    Span<Int> => Box::new(Expression::Int(<>)),
     Span<String> => Box::new(Expression::String(<>)),
     Span<Identifier> => Box::new(Expression::Identifier(<>)),
     "(" <Expression> ")",
     "[" <Comma<Expression>> "]" => Box::new(Expression::Array(<>)),
-    ! => {
+    Span<!> => {
         errors.push(<>);
         Box::new(Expression::ParseError)
     }
@@ -160,8 +160,8 @@ Identifier: Identifier = {
 }
 
 Type: Box<TypeName> = {
-    Identifier => Box::new(TypeName::Type(<>)),
-    <i: Identifier> "<" <t:Comma<Type>> ">" => Box::new(TypeName::GenericType(<>)),
+    Span<Identifier> => Box::new(TypeName::Type(<>)),
+    <i: Span<Identifier>> "<" <t:Comma<Type>> ">" => Box::new(TypeName::GenericType(<>)),
     FunctionType,
 }
 

@@ -15,7 +15,7 @@ pub fn parse_string(
     let mut errors = Vec::new();
     let declarations = rox_parser::ProgramParser::new()
         .parse(&mut errors, source)
-        .map_err(|e| RoxError::from_parse_error(&e, path.clone()))?;
+        .unwrap();
     match errors {
         empty_vec if empty_vec.is_empty() => Ok(declarations),
         error_vec => Err(RoxError::from_error_recoveries(error_vec, path)),

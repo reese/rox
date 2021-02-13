@@ -10,6 +10,15 @@ pub struct Spanned<T> {
     pub span: Span,
 }
 
+impl<T> Spanned<T> {
+    pub fn dummy_span(value: T) -> Self {
+        Spanned {
+            value,
+            span: Span(0, 0),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Expression {
     Access(Box<Expression>, Box<Expression>),
@@ -23,9 +32,9 @@ pub enum Expression {
         Vec<Box<Expression>>,
     ),
     Identifier(Spanned<Identifier>),
-    Float(f64),
-    Int(i32),
-    Operation(Box<Expression>, Operation, Box<Expression>),
+    Float(Spanned<f64>),
+    Int(Spanned<i32>),
+    Operation(Box<Expression>, Spanned<Operation>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     String(Spanned<String>),
     StructInstantiation(
@@ -34,14 +43,14 @@ pub enum Expression {
         Vec<(Identifier, Box<Expression>)>,
     ),
     Unary(Unary, Box<Expression>),
-    Variable(Identifier, Box<Expression>),
+    Variable(Spanned<Identifier>, Box<Expression>),
     ParseError,
 }
 
 #[derive(Clone, Debug)]
 pub enum TypeName {
-    Type(Identifier),
-    GenericType(Identifier, Vec<Box<TypeName>>),
+    Type(Spanned<Identifier>),
+    GenericType(Spanned<Identifier>, Vec<Box<TypeName>>),
     Function(Vec<Box<TypeName>>, Box<TypeName>),
 }
 

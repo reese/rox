@@ -7,6 +7,8 @@ use lalrpop_util::{ErrorRecovery, ParseError};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
+use super::{Span, Spanned};
+
 /// Rox's custom `Result` type
 pub type Result<T> = std::result::Result<T, RoxError>;
 
@@ -45,26 +47,45 @@ impl RoxError {
         }
     }
 
+    pub fn with_label(self, message: &str, span: Span) -> RoxError {
+        let mut labels = self.labels;
+        labels.push(Label::primary((), span.0..span.1).with_message(message));
+        RoxError { labels, ..self }
+    }
+
     pub fn with_file_placeholder(message: &str) -> Self {
         let path = PathBuf::from("./scratch/test.rox");
         Self::new(path, message)
     }
 
     pub fn from_error_recoveries<T: Clone + Into<PathBuf>>(
-        error_vec: std::vec::Vec<
-            lalrpop_util::ErrorRecovery<
-                usize,
-                lalrpop_util::lexer::Token<'_>,
-                &'static str,
+        error_vec: Vec<
+            Spanned<
+                lalrpop_util::ErrorRecovery<
+                    usize,
+                    lalrpop_util::lexer::Token<'_>,
+                    &'static str,
+                >,
             >,
         >,
         file: T,
     ) -> Self {
         let rox_errors: Vec<RoxError> = error_vec
             .iter()
-            .map(|ErrorRecovery { error, .. }| {
-                RoxError::from_parse_error(&error.clone(), file.clone().into())
-            })
+            .map(
+                |Spanned {
+                     value: ErrorRecovery { error, .. },
+                     span,
+                 }| {
+                    RoxError::from_parse_error(
+                        Spanned {
+                            span: span.clone(),
+                            value: error.clone(),
+                        },
+                        file.clone().into(),
+                    )
+                },
+            )
             .collect();
         let labels = rox_errors
             .iter()
@@ -84,28 +105,28 @@ impl RoxError {
     }
 
     pub fn from_parse_error(
-        error: &ParseError<usize, Token<'_>, &'static str>,
+        error: Spanned<ParseError<usize, Token<'_>, &'static str>>,
         file: PathBuf,
     ) -> Self {
         let file_source = read_to_string(file.clone()).unwrap();
         let file =
             SimpleFile::new(String::from(file.to_str().unwrap()), file_source);
-        match error {
-            ParseError::InvalidToken { location } => RoxError {
+        match error.value {
+            ParseError::InvalidToken { .. } => RoxError {
                 file,
                 message: None,
-                labels: vec![Label::primary((), *location..(location + 1))
+                labels: vec![Label::primary((), error.span.0..error.span.1)
                     .with_message("Invalid token.")],
                 notes: Vec::new(),
             },
-            ParseError::UnrecognizedEOF { location, expected } => RoxError {
+            ParseError::UnrecognizedEOF { expected, .. } => RoxError {
                 file,
                 message: None,
-                labels: vec![Label::primary((), *location..(location + 1))
+                labels: vec![Label::primary((), error.span.0..error.span.1)
                     .with_message("Unrecognized EOF")],
                 notes: vec![format!(
                     "Expected one of {:?}",
-                    clean_expected(expected)
+                    clean_expected(&expected)
                 )],
             },
             ParseError::UnrecognizedToken {
@@ -114,11 +135,11 @@ impl RoxError {
             } => RoxError {
                 file,
                 message: None,
-                labels: vec![Label::primary((), *start..*end)
+                labels: vec![Label::primary((), start..end)
                     .with_message("Unrecognized token ")],
                 notes: vec![format!(
                     "Expected one of {:?}",
-                    clean_expected(expected)
+                    clean_expected(&expected)
                 )],
             },
             ParseError::ExtraToken {
@@ -126,14 +147,14 @@ impl RoxError {
             } => RoxError {
                 file,
                 message: Some(format!("Encountered extra token: {:?}", token)),
-                labels: vec![Label::primary((), *start..*end)],
+                labels: vec![Label::primary((), start..end)],
                 notes: Vec::new(),
             },
             // Customer user error message
             // Rox doesn't emit these yet
             ParseError::User { error } => RoxError {
                 file,
-                message: Some(String::from(*error)),
+                message: Some(String::from(error)),
                 labels: Vec::new(),
                 notes: Vec::new(),
             },

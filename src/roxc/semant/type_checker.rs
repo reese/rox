@@ -20,11 +20,14 @@
 //! Once we've constructed all of our types, we now need to verify that those types create
 //! valid programs.
 //! To do this, we need to verify that all the application of our types are equal, or "unified."
-use crate::roxc::semant::types::{Type, TypeConstructor};
 use crate::roxc::semant::{TaggedExpression, TaggedStatement};
 use crate::roxc::{
     builtins, Expression, FunctionDeclaration, Identifier, Result, RoxError,
     Statement, TypeName, Unary,
+};
+use crate::roxc::{
+    semant::types::{Type, TypeConstructor},
+    Spanned,
 };
 use std::collections::HashMap;
 
@@ -235,7 +238,9 @@ fn translate_statement(
                 type_env,
                 return_type_name
                     .unwrap_or_else(|| {
-                        Box::new(TypeName::Type("Void".to_string()))
+                        Box::new(TypeName::Type(Spanned::dummy_span(
+                            "Void".to_string(),
+                        )))
                     })
                     .as_ref()
                     .clone(),
@@ -340,7 +345,9 @@ fn translate_statement(
                 &mut local_type_env,
                 return_type_name
                     .unwrap_or_else(|| {
-                        Box::new(TypeName::Type("Void".to_string()))
+                        Box::new(TypeName::Type(Spanned::dummy_span(
+                            "Void".to_string(),
+                        )))
                     })
                     .as_ref()
                     .clone(),
@@ -748,7 +755,7 @@ fn translate_expression(
                 variable_env,
                 expr.as_ref().clone(),
             )?;
-            variable_env.insert(ident.clone(), expr_value.clone().into());
+            variable_env.insert(ident.value.clone(), expr_value.clone().into());
             Ok(TaggedExpression::Variable(
                 ident,
                 Box::new(expr_value.clone()),
@@ -791,10 +798,10 @@ fn translate_type_identifier(
 ) -> Result<Type> {
     match ty {
         TypeName::Type(identifier) => {
-            Ok(type_env.get(&identifier).unwrap().get_type())
+            Ok(type_env.get(&identifier.value).unwrap().get_type())
         }
         TypeName::GenericType(identifier, generic_types) => {
-            match type_env.get(&identifier).unwrap() {
+            match type_env.get(&identifier.value).unwrap() {
                 TypeValue::Type(t) => Ok(t.clone()), // N.B. This probably shouldn't happen, since formal parameters shouldn't be passed to a concrete type?
                 TypeValue::Constructor(c) => Ok(Type::Apply(
                     c.clone(),

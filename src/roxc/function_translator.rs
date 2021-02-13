@@ -148,10 +148,10 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 }
             }
             TaggedExpression::Int(number) => {
-                Some(self.current_state.int_literal(*number))
+                Some(self.current_state.int_literal(number.value))
             }
             TaggedExpression::Float(num) => {
-                Some(self.current_state.float_literal(*num))
+                Some(self.current_state.float_literal(num.value))
             }
             TaggedExpression::Array(tagged_expressions, type_) => {
                 let expression_values = tagged_expressions
@@ -183,8 +183,9 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 let value: BasicValueEnum<'ctx> = self
                     .translate_expression(expression)
                     .expect("Cannot define variable with void expression");
-                let allocation = self.current_state.store_variable(name, value);
-                self.variables.insert(name.clone(), allocation);
+                let allocation =
+                    self.current_state.store_variable(&name.value, value);
+                self.variables.insert(name.value.clone(), allocation);
                 Some(value)
             }
             TaggedExpression::Identifier(name, _rox_type) => {
@@ -202,25 +203,27 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     .translate_expression(rval)
                     .expect("Cannot perform operation on void value");
                 match rox_type.as_ref() {
-                    Type::Apply(constructor, _) => {
-                        match constructor {
-                            TypeConstructor::Float => {
-                                let left = left.into_float_value();
-                                let right = right.into_float_value();
-                                Some(self.current_state.build_float_operation(
-                                    left, right, operation,
-                                ))
-                            }
-                            TypeConstructor::Int => {
-                                let left = left.into_int_value();
-                                let right = right.into_int_value();
-                                Some(self.current_state.build_int_operation(
-                                    left, right, operation,
-                                ))
-                            }
-                            _ => unreachable!(),
+                    Type::Apply(constructor, _) => match constructor {
+                        TypeConstructor::Float => {
+                            let left = left.into_float_value();
+                            let right = right.into_float_value();
+                            Some(self.current_state.build_float_operation(
+                                left,
+                                right,
+                                &operation.value,
+                            ))
                         }
-                    }
+                        TypeConstructor::Int => {
+                            let left = left.into_int_value();
+                            let right = right.into_int_value();
+                            Some(self.current_state.build_int_operation(
+                                left,
+                                right,
+                                &operation.value,
+                            ))
+                        }
+                        _ => unreachable!(),
+                    },
                     Type::Variable(_) | Type::PolymorphicType(_, _) => {
                         unreachable!()
                     }
