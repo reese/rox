@@ -49,6 +49,7 @@ pub enum Expression {
 
 #[derive(Clone, Debug)]
 pub enum TypeName {
+    ArrayType(Box<TypeName>),
     Type(Spanned<Identifier>),
     GenericType(Spanned<Identifier>, Vec<Box<TypeName>>),
     Function(Vec<Box<TypeName>>, Box<TypeName>),

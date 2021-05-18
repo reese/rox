@@ -498,7 +498,7 @@ fn translate_expression(
                 Box::new(tagged_right),
             ))
         }
-        Expression::Array(mut expressions) => {
+        Expression::Array(expressions) => {
             // TODO: Handle starting with an empty array
             let first_expression =
                 expressions.first().expect("Cannot initialize empty array");
@@ -507,8 +507,7 @@ fn translate_expression(
                 variable_env,
                 first_expression.as_ref().clone(),
             )?;
-            expressions.remove(0);
-            let mut all_expressions = expressions
+            let mut all_expressions = expressions[1..]
                 .iter()
                 .map(|e| {
                     let translated_expr = translate_expression(
@@ -523,12 +522,14 @@ fn translate_expression(
                     Ok(translated_expr)
                 })
                 .collect::<Result<Vec<_>>>()?;
-            all_expressions.push(first_tagged_expression.clone());
+            all_expressions.insert(0, first_tagged_expression.clone());
             Ok(TaggedExpression::Array(
                 all_expressions,
                 Box::new(Type::Apply(
-                    TypeConstructor::Array,
-                    vec![first_tagged_expression.into()],
+                    TypeConstructor::Array(Box::new(
+                        first_tagged_expression.into(),
+                    )),
+                    Vec::new(),
                 )),
             ))
         }
@@ -799,6 +800,14 @@ fn translate_type_identifier(
     match ty {
         TypeName::Type(identifier) => {
             Ok(type_env.get(&identifier.value).unwrap().get_type())
+        }
+        TypeName::ArrayType(type_) => {
+            let inner_type =
+                translate_type_identifier(type_env, type_.as_ref().to_owned())?;
+            Ok(Type::Apply(
+                TypeConstructor::Array(Box::new(inner_type)),
+                vec![],
+            ))
         }
         TypeName::GenericType(identifier, generic_types) => {
             match type_env.get(&identifier.value).unwrap() {

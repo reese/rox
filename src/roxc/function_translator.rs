@@ -3,7 +3,7 @@ use crate::roxc::{
     FunctionDeclaration, Identifier, TaggedExpression, TaggedStatement,
 };
 use inkwell::basic_block::BasicBlock;
-use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, PointerValue};
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -159,22 +159,22 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     .map(|t| {
                         self.translate_expression(t)
                             .expect("Cannot create array from void value")
-                            .into_array_value()
                     })
                     .collect::<Vec<_>>();
                 let llvm_type: BasicTypeEnum = CompilerState::get_type(
                     self.current_state.get_context(),
                     type_.as_ref(),
                     self.variables,
-                    Some(tagged_expressions.len()),
+                    Some(expression_values.len()),
                 )
                 .expect("Unexpected void expression type");
-                Some(
-                    llvm_type
-                        .array_type(0)
-                        .const_array(expression_values.as_slice())
-                        .into(),
-                )
+
+                Some(unsafe {
+                    self.current_state.build_array_literal(
+                        expression_values.as_slice(),
+                        llvm_type,
+                    )
+                })
             }
             TaggedExpression::String(string) => {
                 Some(self.current_state.string_literal(&string.value))

@@ -48,7 +48,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         maybe_len: Option<usize>,
     ) -> Option<BasicTypeEnum<'c>> {
         match ty {
-            Type::Apply(constructor, _) => {
+            Type::Apply(constructor, _type_arguments) => {
                 use super::semant::TypeConstructor::*;
                 match constructor {
                     Bool => Some(context.bool_type().into()),
@@ -57,12 +57,29 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                     String => Some(
                         context
                             .i8_type()
-                            .array_type(maybe_len.unwrap() as u32) // 0 creates a variable sized array
+                            .array_type((maybe_len.unwrap() + 1) as u32)
                             .ptr_type(AddressSpace::Generic)
                             .into(),
                     ),
                     Void => None,
-                    x => todo!("Need to handle type constructor for: {:?}", x),
+                    Array(inner_type) => {
+                        let inner_type = CompilerState::get_type(
+                            context,
+                            inner_type,
+                            environment,
+                            maybe_len,
+                        )
+                        .unwrap();
+                        Some(
+                            inner_type
+                                .array_type(0)
+                                .ptr_type(AddressSpace::Generic)
+                                .into(),
+                        )
+                    }
+                    Arrow | Record(_) | FunctionType(_, _) | Unique(_) => {
+                        todo!()
+                    }
                 }
             }
             Type::Variable(variable_name) => environment
@@ -108,6 +125,28 @@ impl<'f, 'c> CompilerState<'f, 'c> {
 
     pub fn build_fallback_branch(&self, merge_block: BasicBlock) {
         self.builder.build_unconditional_branch(merge_block);
+    }
+
+    pub unsafe fn build_array_literal(
+        &self,
+        items: &[BasicValueEnum],
+        type_: BasicTypeEnum<'c>,
+    ) -> BasicValueEnum<'c> {
+        let len = self.context.i32_type().const_int(items.len() as u64, false);
+        let allocation =
+            self.builder.build_array_malloc(type_, len, "").unwrap(); // TODO: Properly handle allocation failures
+        let load_inst =
+            self.builder.build_load(allocation, "").into_pointer_value();
+        items.iter().enumerate().for_each(|(index, item)| {
+            let int = self.int_literal(1).into_int_value();
+            let ptr = self.builder.build_in_bounds_gep(
+                load_inst,
+                &[int, self.int_literal(index as i32).into_int_value()],
+                "",
+            );
+            self.builder.build_store(ptr, item.as_basic_value_enum());
+        });
+        load_inst.as_basic_value_enum()
     }
 
     pub fn bool_literal(&self, boolean: bool) -> BasicValueEnum<'c> {

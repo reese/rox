@@ -28,10 +28,6 @@ pub(crate) fn get_builtin_types() -> (
         TypeValue::from(&Type::Apply(TypeConstructor::Void, Vec::new())),
     );
     type_env.insert(
-        "Array".to_string(),
-        TypeValue::Constructor(TypeConstructor::Array),
-    );
-    type_env.insert(
         "Bool".to_string(),
         TypeValue::from(&Type::Apply(TypeConstructor::Bool, Vec::new())),
     );

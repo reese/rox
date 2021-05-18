@@ -160,6 +160,7 @@ Identifier: Identifier = {
 }
 
 Type: Box<TypeName> = {
+    "[" <Type> "]" => Box::new(TypeName::ArrayType(<>)),
     Span<Identifier> => Box::new(TypeName::Type(<>)),
     <i: Span<Identifier>> "<" <t:Comma<Type>> ">" => Box::new(TypeName::GenericType(<>)),
     FunctionType,
@@ -180,6 +181,10 @@ Float: f64 = {
 
 Int: i32 = {
     r"[0-9]+" => i32::from_str(<>).unwrap()
+}
+
+Length: u32 = {
+    r"[0-9]+" => u32::from_str(<>).unwrap()
 }
 
 String: String = {

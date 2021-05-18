@@ -9,7 +9,7 @@ pub enum TypeConstructor {
     String,
     Void,
     Arrow,
-    Array,
+    Array(Box<Type>),
     /// The Record type constructor takes a list of field name identifiers and their types
     Record(Vec<(Identifier, Type)>),
     /// Takes the list of formal type parameters and the return type
