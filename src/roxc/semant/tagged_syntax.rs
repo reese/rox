@@ -51,7 +51,7 @@ impl Into<semant::Type> for &TaggedExpression {
             | FunctionCall(_, _, t)
             | StructInstantiation(t, _)
             | Identifier(_, t) => t.as_ref().clone(),
-            And(_, _) | Boolean(_) => {
+            And(_, _) | Or(_, _) | Boolean(_) => {
                 Type::Apply(TypeConstructor::Bool, Vec::new())
             }
             Float(_) => Type::Apply(TypeConstructor::Float, Vec::new()),
@@ -68,7 +68,7 @@ impl Into<semant::Type> for &TaggedExpression {
                     }
                 }
             }
-            x => todo!("{:?}", x),
+            Variable(_, _, _) | Unary(_, _, _) => todo!(),
         }
     }
 }
