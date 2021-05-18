@@ -1,0 +1,9 @@
+fn get_array() -> [Int] do
+    return [0, 1, 2, 3, 4];
+end
+
+fn main() -> Int do
+    let x = get_array();
+
+    return 0;
+end

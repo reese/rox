@@ -1,0 +1,8 @@
+use std::path::PathBuf;
+
+#[test]
+fn {name}() {{
+    let result = run_file(PathBuf::from("{path}"));
+
+    assert!(result.success(), "Expected a successful error code, but got error code {{}}", result);
+}}
