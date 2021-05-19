@@ -70,12 +70,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                             maybe_len,
                         )
                         .unwrap();
-                        Some(
-                            inner_type
-                                .array_type(0)
-                                .ptr_type(AddressSpace::Generic)
-                                .into(),
-                        )
+                        Some(inner_type.array_type(0).into())
                     }
                     Arrow | Record(_) | FunctionType(_, _) | Unique(_) => {
                         todo!()
@@ -133,19 +128,24 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         type_: BasicTypeEnum<'c>,
     ) -> BasicValueEnum<'c> {
         let len = self.context.i32_type().const_int(items.len() as u64, false);
-        let allocation =
-            self.builder.build_array_malloc(type_, len, "").unwrap(); // TODO: Properly handle allocation failures
-        let load_inst =
-            self.builder.build_load(allocation, "").into_pointer_value();
+        let allocation = self.builder.build_array_alloca(type_, len, "");
+        let array = self.builder.build_load(allocation, "load array");
+
         items.iter().enumerate().for_each(|(index, item)| {
-            let int = self.int_literal(1).into_int_value();
-            let ptr = self.builder.build_in_bounds_gep(
-                load_inst,
-                &[int, self.int_literal(index as i32).into_int_value()],
-                "",
+            self.builder.build_insert_value(
+                array.into_array_value(),
+                item.as_basic_value_enum(),
+                index as u32,
+                "insert value",
             );
-            self.builder.build_store(ptr, item.as_basic_value_enum());
         });
+
+        let pointer = self.builder.build_address_space_cast(
+            allocation,
+            allocation.get_type(),
+            "",
+        );
+        let load_inst = self.builder.build_load(pointer, "").into_array_value();
         load_inst.as_basic_value_enum()
     }
 

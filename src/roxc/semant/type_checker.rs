@@ -34,6 +34,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub(crate) enum TypeValue {
     Type(Type),
+    #[allow(dead_code)]
     Constructor(TypeConstructor),
 }
 
