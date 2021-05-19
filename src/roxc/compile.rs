@@ -71,7 +71,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
         let tagged_statements = analyse_program(declarations.to_vec())?;
         tagged_statements
             .iter()
-            .map(|declaration| Ok(self.translate_declaration(declaration)?))
+            .map(|declaration| self.translate_declaration(declaration))
             .collect()
     }
 

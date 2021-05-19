@@ -2,16 +2,13 @@ mod syntax;
 
 use crate::roxc::RoxError;
 use crate::Result;
-use std::fs::read_to_string;
 use std::path::PathBuf;
+use std::{fs::read_to_string, path::Path};
 pub use syntax::*;
 
 lalrpop_mod!(#[allow(clippy::all)] pub rox_parser);
 
-pub fn parse_string(
-    source: &str,
-    path: &PathBuf,
-) -> Result<Vec<Box<Statement>>> {
+pub fn parse_string(source: &str, path: &Path) -> Result<Vec<Box<Statement>>> {
     let mut errors = Vec::new();
     let declarations = rox_parser::ProgramParser::new()
         .parse(&mut errors, source)

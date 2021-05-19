@@ -34,17 +34,10 @@ pub enum TaggedExpression {
     Variable(Spanned<Identifier>, Box<TaggedExpression>, Box<Type>),
 }
 
-// This sucks - @reese
-impl Into<semant::Type> for TaggedExpression {
-    fn into(self) -> semant::Type {
-        (&self).into()
-    }
-}
-
-impl Into<semant::Type> for &TaggedExpression {
-    fn into(self) -> semant::Type {
+impl From<TaggedExpression> for semant::Type {
+    fn from(expr: TaggedExpression) -> semant::Type {
         use TaggedExpression::*;
-        match self {
+        match expr {
             Access(_, _, t)
             | Array(_, t)
             | Assignment(_, _, t)
