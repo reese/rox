@@ -1,6 +1,6 @@
 use crate::roxc::parser::FunctionDeclaration;
 use crate::roxc::stack::Stack;
-use crate::roxc::{Type, TypeConstructor, TypeEnv, TypeValue, VariableEnv};
+use crate::roxc::{Type, TypeConstructor, TypeEnv, VariableEnv};
 use std::collections::HashMap;
 
 pub(crate) fn get_builtin_types() -> (
@@ -13,23 +13,23 @@ pub(crate) fn get_builtin_types() -> (
 
     type_env.insert(
         "Int".to_string(),
-        TypeValue::from(&Type::Apply(TypeConstructor::Int, Vec::new())),
+        Type::Apply(TypeConstructor::Int, Vec::new()),
     );
     type_env.insert(
         "Float".to_string(),
-        TypeValue::from(&Type::Apply(TypeConstructor::Float, Vec::new())),
+        Type::Apply(TypeConstructor::Float, Vec::new()),
     );
     type_env.insert(
         "String".to_string(),
-        TypeValue::from(&Type::Apply(TypeConstructor::String, Vec::new())),
+        Type::Apply(TypeConstructor::String, Vec::new()),
     );
     type_env.insert(
         "Void".to_string(),
-        TypeValue::from(&Type::Apply(TypeConstructor::Void, Vec::new())),
+        Type::Apply(TypeConstructor::Void, Vec::new()),
     );
     type_env.insert(
         "Bool".to_string(),
-        TypeValue::from(&Type::Apply(TypeConstructor::Bool, Vec::new())),
+        Type::Apply(TypeConstructor::Bool, Vec::new()),
     );
     let mut function_stack: Stack<HashMap<String, FunctionDeclaration>> =
         Stack::new();

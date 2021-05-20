@@ -36,31 +36,7 @@ use std::collections::HashMap;
 
 use super::TaggedLValue;
 
-#[derive(Clone, Debug)]
-pub(crate) enum TypeValue {
-    Type(Type),
-    #[allow(dead_code)]
-    Constructor(TypeConstructor),
-}
-
-impl TypeValue {
-    fn get_type(&self) -> Type {
-        match self {
-            TypeValue::Type(t) => t.clone(),
-            TypeValue::Constructor(_) => {
-                panic!("Expected a type variable, not a type constructor")
-            }
-        }
-    }
-}
-
-impl From<&Type> for TypeValue {
-    fn from(t: &Type) -> TypeValue {
-        TypeValue::Type(t.clone())
-    }
-}
-
-pub(crate) type TypeEnv = HashMap<Identifier, TypeValue>;
+pub(crate) type TypeEnv = HashMap<Identifier, Type>;
 pub(crate) type VariableEnv = HashMap<Identifier, Type>;
 
 fn substitute(ty: Type, env: &mut TypeEnv) -> Type {
@@ -84,7 +60,7 @@ fn substitute(ty: Type, env: &mut TypeEnv) -> Type {
             ),
         },
         Type::Variable(identifier) => match env.get(&identifier) {
-            Some(type_) => type_.clone().get_type(),
+            Some(type_) => type_.clone(),
             None => Type::Variable(identifier),
         },
         Type::PolymorphicType(formal_parameters, type_) => {
@@ -143,12 +119,7 @@ fn unify(type_one: Type, type_two: Type) -> Result<()> {
                     &mut formal_types
                         .iter()
                         .cloned()
-                        .zip(
-                            second_type_arguments
-                                .iter()
-                                .map(TypeValue::from)
-                                .collect::<Vec<_>>(),
-                        )
+                        .zip(second_type_arguments)
                         .collect::<HashMap<_, _>>(),
                 ),
                 type_two,
@@ -212,11 +183,7 @@ fn expand(t: Type) -> Type {
 }
 
 fn zip_argument_types(names: Vec<Identifier>, types: Vec<Type>) -> TypeEnv {
-    names
-        .iter()
-        .cloned()
-        .zip(types.iter().map(TypeValue::from).collect::<Vec<_>>())
-        .collect::<HashMap<_, _>>()
+    names.iter().cloned().zip(types).collect::<HashMap<_, _>>()
 }
 
 fn translate_statement(
@@ -281,10 +248,7 @@ fn translate_statement(
             let mut local_type_env = type_env.clone();
             maybe_formal_arguments.iter().for_each(|generic_types| {
                 generic_types.iter().for_each(|t| {
-                    local_type_env.insert(
-                        t.clone(),
-                        TypeValue::Type(Type::Variable(t.clone())),
-                    );
+                    local_type_env.insert(t.clone(), Type::Variable(t.clone()));
                 });
             });
 
@@ -312,8 +276,7 @@ fn translate_statement(
                 )),
             );
 
-            type_env
-                .insert(struct_name.clone(), TypeValue::Type(new_type.clone()));
+            type_env.insert(struct_name.clone(), new_type.clone());
             variable_env.insert(struct_name, new_type);
 
             Ok(TaggedStatement::StructDeclaration)
@@ -328,10 +291,8 @@ fn translate_statement(
             let mut local_type_env = type_env.clone();
             if let Some(formal_arguments) = maybe_formal_arguments.clone() {
                 formal_arguments.iter().for_each(|ty| {
-                    local_type_env.insert(
-                        ty.clone(),
-                        TypeValue::Type(Type::Variable(ty.clone())),
-                    );
+                    local_type_env
+                        .insert(ty.clone(), Type::Variable(ty.clone()));
                 });
             };
             let function_decl_types = parameters
@@ -632,15 +593,9 @@ fn translate_expression(
                 generics
                     .iter()
                     .cloned()
-                    .zip(
-                        instantiated_generics
-                            .iter()
-                            .map(|t| TypeValue::Type(t.clone()))
-                            .collect::<Vec<_>>(),
-                    )
+                    .zip(instantiated_generics)
                     .for_each(|(ident, type_)| {
-                        all_types
-                            .insert(ident, TypeValue::Type(type_.get_type()));
+                        all_types.insert(ident, type_);
                     });
 
                 if let Type::Apply(_constructor, mut types) =
@@ -733,8 +688,7 @@ fn translate_expression(
                 Expression::Identifier(identifier.clone()),
             )?;
 
-            let struct_type =
-                type_env.get(&identifier.value).unwrap().get_type();
+            let struct_type = type_env.get(&identifier.value).unwrap();
 
             if let Type::PolymorphicType(generics, record_type_constructor) =
                 expand(tagged_struct_identifier.into())
@@ -744,19 +698,11 @@ fn translate_expression(
                     .iter_mut()
                     .map(|(n, t)| (n.clone(), t.clone()))
                     .collect();
-                generics
-                    .iter()
-                    .cloned()
-                    .zip(
-                        generic_args
-                            .iter()
-                            .map(|t| TypeValue::Type(t.clone()))
-                            .collect::<Vec<_>>(),
-                    )
-                    .for_each(|(ident, type_)| {
-                        all_types
-                            .insert(ident, TypeValue::Type(type_.get_type()));
-                    });
+                generics.iter().cloned().zip(generic_args).for_each(
+                    |(ident, type_)| {
+                        all_types.insert(ident, type_);
+                    },
+                );
 
                 let tagged_field_params = fields
                     .iter()
@@ -847,7 +793,7 @@ fn translate_type_identifier(
 ) -> Result<Type> {
     match ty {
         TypeName::Type(identifier) => {
-            Ok(type_env.get(&identifier.value).unwrap().get_type())
+            Ok(type_env.get(&identifier.value).unwrap().clone())
         }
         TypeName::ArrayType(type_) => {
             let inner_type =
@@ -857,22 +803,23 @@ fn translate_type_identifier(
                 vec![],
             ))
         }
-        TypeName::GenericType(identifier, generic_types) => {
-            match type_env.get(&identifier.value).unwrap() {
-                TypeValue::Type(t) => Ok(t.clone()), // N.B. This probably shouldn't happen, since formal parameters shouldn't be passed to a concrete type?
-                TypeValue::Constructor(c) => Ok(Type::Apply(
-                    c.clone(),
-                    generic_types
-                        .iter()
-                        .map(|t| {
-                            translate_type_identifier(
-                                type_env,
-                                t.as_ref().clone(),
-                            )
-                        })
-                        .collect::<Result<Vec<_>>>()?,
-                )),
-            }
+        TypeName::GenericType(_identifier, _generic_types) => {
+            todo!()
+            // match type_env.get(&identifier.value).unwrap() {
+            //     TypeValue::Type(t) => Ok(t.clone()), // N.B. This probably shouldn't happen, since formal parameters shouldn't be passed to a concrete type?
+            //     TypeValue::Constructor(c) => Ok(Type::Apply(
+            //         c.clone(),
+            //         generic_types
+            //             .iter()
+            //             .map(|t| {
+            //                 translate_type_identifier(
+            //                     type_env,
+            //                     t.as_ref().clone(),
+            //                 )
+            //             })
+            //             .collect::<Result<Vec<_>>>()?,
+            //     )),
+            // }
         }
         TypeName::Function(mut argument_types, return_type) => {
             argument_types.push(return_type);
