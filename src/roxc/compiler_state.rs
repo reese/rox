@@ -129,8 +129,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
     ) -> BasicValueEnum<'c> {
         let zero = self.context.i64_type().const_int(1, false);
         let pointer = unsafe {
-            self.builder
-                .build_in_bounds_gep(dbg!(array), &[zero, index], "")
+            self.builder.build_in_bounds_gep(array, &[zero, index], "")
         };
         self.builder.build_load(pointer, "")
     }

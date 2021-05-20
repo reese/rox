@@ -39,5 +39,6 @@ fn main() {
         Roxc::Build { file, output, .. } => build_file(file, output),
         Roxc::Run { file } => run_file(file),
     };
+    println!("rox: {}", exit_status);
     exit(exit_status.code().unwrap_or(0));
 }
