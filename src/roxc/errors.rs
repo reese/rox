@@ -35,7 +35,7 @@ pub struct RoxError {
 
 impl RoxError {
     pub fn new<T: Clone + Into<PathBuf>>(file: T, message: &str) -> Self {
-        let contents = read_to_string(file.clone().into()).unwrap();
+        let contents = read_to_string(dbg!(file.clone().into())).unwrap();
         RoxError {
             file: SimpleFile::new(
                 file.into().to_str().unwrap().to_string(),
@@ -54,7 +54,7 @@ impl RoxError {
     }
 
     pub fn with_file_placeholder(message: &str) -> Self {
-        let path = PathBuf::from("./scratch/test.rox");
+        let path = PathBuf::from("./examples/array.rox");
         Self::new(path, message)
     }
 

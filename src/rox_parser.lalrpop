@@ -1,4 +1,4 @@
-use crate::roxc::{Block, Expression, Identifier, Operation, Param, TypeName, Statement, Span, Spanned, Unary};
+use crate::roxc::{Block, Expression, Identifier, Operation, Param, TypeName, Statement, Span, Spanned, Unary, LValue};
 use std::str::FromStr;
 use lalrpop_util::ErrorRecovery;
 
@@ -28,9 +28,9 @@ Block: Block = {
 
 Statement: Box<Statement> = {
     <Expression> ";" => Box::new(Statement::Expression(<>)),
-    <ReturnStatement>,
-    <Function>,
-    <StructDeclaration>,
+    ReturnStatement,
+    Function,
+    StructDeclaration,
     "if" <Expression> <Block> <("else" <Block>)?> => Box::new(Statement::IfElse(<>)),
 }
 
@@ -43,12 +43,14 @@ Expression: Box<Expression> = {
 }
 
 Assignment: Box<Expression> = {
-    // TODO: Allow for assignment to function results
-    // i.e. `some_call().attribute = 3;`
-    <Call> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
+    <LVal> "=" <Assignment> => Box::new(Expression::Assignment(<>)),
     "let" <Span<Identifier>> "=" <Assignment> => Box::new(Expression::Variable(<>)),
     <Span<Identifier>><("::" "<" <Comma<Type>> ">")?> "{" <Comma<(<Identifier> ":" <Expression>)>> "}" => Box::new(Expression::StructInstantiation(<>)),
     LogicOr
+}
+
+LVal: Box<LValue> = {
+    Call => Box::new(LValue(<>.as_ref().clone())),
 }
 
 LogicOr: Box<Expression> = {
@@ -97,7 +99,8 @@ Call: Box<Expression> = {
 }
 
 Access: Box<Expression> = {
-    <Call> "[" <Call> "]" => Box::new(Expression::Access(<>)),
+    <Call> "[" <Call> "]" => Box::new(Expression::BracketAccess(<>)),
+    <Call> "." <Identifier> => Box::new(Expression::DotAccess(<>))
 }
 
 ComparisonOp: Operation = {
@@ -111,12 +114,7 @@ EqualityOp: Operation = {
 }
 
 Params: Vec<Param> = {
-    <first:(Param)?> <mut rest: ("," <Param>)*> ","? => {
-        if let Some(first_param) = first {
-            rest.insert(0, first_param);
-        }
-        rest
-    }
+    Comma<Param>
 }
 
 Param: Param = {

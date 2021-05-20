@@ -10,12 +10,15 @@ use crate::roxc::{semant, FunctionDeclaration, Identifier, Operation, Unary};
 use parser::Spanned;
 
 #[derive(Clone, Debug)]
+pub struct TaggedLValue(pub TaggedExpression);
+
+#[derive(Clone, Debug)]
 #[allow(clippy::vec_box, dead_code)]
 pub enum TaggedExpression {
     Access(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
     And(Box<TaggedExpression>, Box<TaggedExpression>),
     Array(Vec<TaggedExpression>, Box<Type>),
-    Assignment(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
+    Assignment(Box<TaggedLValue>, Box<TaggedExpression>, Box<Type>),
     Boolean(bool),
     FunctionCall(Spanned<Identifier>, Vec<TaggedExpression>, Box<Type>),
     Identifier(Spanned<Identifier>, Box<Type>),
@@ -32,6 +35,12 @@ pub enum TaggedExpression {
     StructInstantiation(Box<Type>, Vec<(Identifier, Box<TaggedExpression>)>),
     Unary(Unary, Box<TaggedExpression>, Box<Type>),
     Variable(Spanned<Identifier>, Box<TaggedExpression>, Box<Type>),
+}
+
+impl From<TaggedLValue> for semant::Type {
+    fn from(lval: TaggedLValue) -> Self {
+        lval.0.into()
+    }
 }
 
 impl From<TaggedExpression> for semant::Type {

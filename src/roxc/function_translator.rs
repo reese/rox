@@ -193,7 +193,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     .variables
                     .get(&name.value)
                     .expect("Variable not defined");
-                Some(self.current_state.load_variable(*variable, &name.value))
+                Some((*variable).into())
             }
             TaggedExpression::Operation(lval, operation, rval, rox_type) => {
                 let left = self
@@ -229,11 +229,28 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     }
                 }
             }
+            TaggedExpression::Access(
+                array_value,
+                index_value,
+                _inner_array_type,
+            ) => {
+                let lval_expr = self
+                    .translate_expression(array_value)
+                    .unwrap()
+                    .into_pointer_value();
+                let index_value = self
+                    .translate_expression(index_value)
+                    .unwrap()
+                    .into_int_value();
+                Some(
+                    self.current_state
+                        .build_array_access(lval_expr, index_value),
+                )
+            }
             TaggedExpression::StructInstantiation(_struct_type, _fields) => {
                 todo!()
             }
-            TaggedExpression::Access(_, _, _)
-            | TaggedExpression::And(_, _)
+            TaggedExpression::And(_, _)
             | TaggedExpression::Assignment(_, _, _)
             | TaggedExpression::Or(_, _)
             | TaggedExpression::Unary(_, _, _) => todo!(),

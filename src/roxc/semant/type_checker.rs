@@ -20,7 +20,6 @@
 //! Once we've constructed all of our types, we now need to verify that those types create
 //! valid programs.
 //! To do this, we need to verify that all the application of our types are equal, or "unified."
-use crate::roxc::semant::{TaggedExpression, TaggedStatement};
 use crate::roxc::{
     builtins, Expression, FunctionDeclaration, Identifier, Result, RoxError,
     Statement, TypeName, Unary,
@@ -29,7 +28,13 @@ use crate::roxc::{
     semant::types::{Type, TypeConstructor},
     Spanned,
 };
+use crate::roxc::{
+    semant::{TaggedExpression, TaggedStatement},
+    LValue,
+};
 use std::collections::HashMap;
+
+use super::TaggedLValue;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TypeValue {
@@ -450,13 +455,55 @@ fn translate_statement(
     }
 }
 
+fn translate_lvalue(
+    type_env: &mut TypeEnv,
+    variable_env: &mut VariableEnv,
+    lval: LValue,
+) -> Result<TaggedLValue> {
+    Ok(TaggedLValue(translate_expression(
+        type_env,
+        variable_env,
+        lval.0,
+    )?))
+}
+
 fn translate_expression(
     type_env: &mut TypeEnv,
     variable_env: &mut VariableEnv,
     expression: Expression,
 ) -> Result<TaggedExpression> {
     match expression {
-        Expression::Access(_left_expr, _right_expr) => todo!(),
+        Expression::DotAccess(..) => todo!(),
+        Expression::BracketAccess(array_expr, index_expr) => {
+            let tagged_left = translate_expression(
+                type_env,
+                variable_env,
+                array_expr.as_ref().clone(),
+            )?;
+            let tagged_right = translate_expression(
+                type_env,
+                variable_env,
+                index_expr.as_ref().clone(),
+            )?;
+            unify(
+                tagged_right.clone().into(),
+                Type::Apply(TypeConstructor::Int, Vec::new()),
+            )?;
+
+            if let Type::Apply(TypeConstructor::Array(inner_type, ..), ..) =
+                Type::from(tagged_left.clone())
+            {
+                Ok(TaggedExpression::Access(
+                    Box::new(tagged_left),
+                    Box::new(tagged_right),
+                    inner_type,
+                ))
+            } else {
+                Err(RoxError::with_file_placeholder(
+                    "Cannot index into non-array type",
+                ))
+            }
+        }
         Expression::Or(left_expr, right_expr) => {
             let tagged_left = translate_expression(
                 type_env,
@@ -534,11 +581,11 @@ fn translate_expression(
                 )),
             ))
         }
-        Expression::Assignment(left_expr, right_expr) => {
-            let tagged_left = translate_expression(
+        Expression::Assignment(lval, right_expr) => {
+            let tagged_left = translate_lvalue(
                 type_env,
                 variable_env,
-                left_expr.as_ref().clone(),
+                lval.as_ref().clone(),
             )?;
             let tagged_right = translate_expression(
                 type_env,

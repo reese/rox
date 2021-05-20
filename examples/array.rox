@@ -5,5 +5,5 @@ end
 fn main() -> Int do
     let x = get_array();
 
-    return 0;
+    return x[0];
 end

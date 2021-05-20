@@ -20,11 +20,15 @@ impl<T> Spanned<T> {
 }
 
 #[derive(Clone, Debug)]
+pub struct LValue(pub Expression);
+
+#[derive(Clone, Debug)]
 pub enum Expression {
-    Access(Box<Expression>, Box<Expression>),
+    BracketAccess(Box<Expression>, Box<Expression>),
+    DotAccess(Box<Expression>, Identifier),
     And(Box<Expression>, Box<Expression>),
     Array(Vec<Box<Expression>>),
-    Assignment(Box<Expression>, Box<Expression>),
+    Assignment(Box<LValue>, Box<Expression>),
     Boolean(bool),
     FunctionCall(
         Spanned<Identifier>,

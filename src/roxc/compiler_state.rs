@@ -122,6 +122,19 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.builder.build_unconditional_branch(merge_block);
     }
 
+    pub fn build_array_access(
+        &self,
+        array: PointerValue<'c>,
+        index: IntValue<'c>,
+    ) -> BasicValueEnum<'c> {
+        let zero = self.context.i64_type().const_int(1, false);
+        let pointer = unsafe {
+            self.builder
+                .build_in_bounds_gep(dbg!(array), &[zero, index], "")
+        };
+        self.builder.build_load(pointer, "")
+    }
+
     pub unsafe fn build_array_literal(
         &self,
         items: &[BasicValueEnum],
@@ -171,6 +184,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.context.const_string(string.as_bytes(), false).into()
     }
 
+    #[allow(dead_code)]
     pub fn load_variable(
         &self,
         pointer: PointerValue<'c>,
