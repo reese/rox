@@ -454,7 +454,7 @@ fn translate_expression(
             if let Type::Apply(TypeConstructor::Array(inner_type, ..), ..) =
                 Type::from(tagged_left.clone())
             {
-                Ok(TaggedExpression::Access(
+                Ok(TaggedExpression::BracketAccess(
                     Box::new(tagged_left),
                     Box::new(tagged_right),
                     inner_type,

@@ -33,14 +33,14 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
         function_stack: &'a mut Stack<HashMap<Identifier, FunctionDeclaration>>,
     ) -> Self {
         // TODO: Which of these do we actually want?
-        function_pass_manager.add_instruction_combining_pass();
-        function_pass_manager.add_reassociate_pass();
-        function_pass_manager.add_gvn_pass();
-        function_pass_manager.add_cfg_simplification_pass();
-        function_pass_manager.add_basic_alias_analysis_pass();
-        function_pass_manager.add_promote_memory_to_register_pass();
-        function_pass_manager.add_instruction_combining_pass();
-        function_pass_manager.add_reassociate_pass();
+        // Only runs with --release
+        // function_pass_manager.add_instruction_combining_pass();
+        // function_pass_manager.add_reassociate_pass();
+        // function_pass_manager.add_gvn_pass();
+        // function_pass_manager.add_cfg_simplification_pass();
+        // function_pass_manager.add_basic_alias_analysis_pass();
+        // function_pass_manager.add_promote_memory_to_register_pass();
+        // function_pass_manager.add_instruction_combining_pass();
 
         function_pass_manager.initialize();
 
@@ -61,6 +61,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
     }
 
     pub fn finish(&self, path: impl Into<PathBuf> + Sized) -> bool {
+        self.module.print_to_stderr();
         self.module.write_bitcode_to_path(&path.into())
     }
 

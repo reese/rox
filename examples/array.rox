@@ -1,5 +1,5 @@
 fn get_array() -> [Int] do
-    return [0, 1, 2, 3, 4];
+    return [5, 4, 3, 2, 0];
 end
 
 fn main() -> Int do

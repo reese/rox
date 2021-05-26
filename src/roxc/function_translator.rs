@@ -2,13 +2,13 @@ use crate::roxc::compiler_state::CompilerState;
 use crate::roxc::{
     FunctionDeclaration, Identifier, TaggedExpression, TaggedStatement,
 };
-use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, PointerValue};
+use inkwell::{basic_block::BasicBlock, values::IntValue};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
-use super::{Type, TypeConstructor};
+use super::{TaggedLValue, Type, TypeConstructor};
 
 pub struct FunctionTranslator<'func, 'context> {
     current_state: &'func CompilerState<'func, 'context>,
@@ -43,7 +43,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
         match statement.borrow() {
             TaggedStatement::StructDeclaration => {}
             TaggedStatement::Expression(expression) => {
-                self.translate_expression(expression);
+                self.translate_expression(expression.to_owned());
             }
             TaggedStatement::FunctionDeclaration(..) => {
                 panic!("For right now, functions can only be declared at the top level.")
@@ -58,7 +58,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             }
             TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
-                    if let Some(return_) = self.translate_expression(expression)
+                    if let Some(return_) = self.translate_expression(expression.to_owned())
                     {
                         self.current_state.build_return(Some(&return_));
                     } else {
@@ -78,7 +78,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 let merge_block =
                     self.current_state.append_basic_block("continue");
                 let conditional_value = self
-                    .translate_expression(conditional)
+                    .translate_expression(conditional.as_ref().to_owned())
                     .expect("Cannot evaluate condition with void value")
                     .into_float_value();
                 self.current_state.build_conditional(
@@ -122,11 +122,11 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
 
     pub fn translate_expression(
         &mut self,
-        expression: &TaggedExpression,
+        expression: TaggedExpression,
     ) -> Option<BasicValueEnum<'ctx>> {
         match expression {
             TaggedExpression::Boolean(bool) => {
-                Some(self.current_state.bool_literal(*bool))
+                Some(self.current_state.bool_literal(bool))
             }
             TaggedExpression::FunctionCall(function_name, args, _rox_type) => {
                 if let Some(function) =
@@ -135,7 +135,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     let argument_values: Vec<BasicValueEnum<'ctx>> = args
                         .iter()
                         .map(|arg| {
-                            self.translate_expression(arg).expect(
+                            self.translate_expression(arg.to_owned()).expect(
                                 "Cannot pass void expression as argument",
                             )
                         })
@@ -154,34 +154,19 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 Some(self.current_state.float_literal(num.value))
             }
             TaggedExpression::Array(tagged_expressions, type_) => {
-                let expression_values = tagged_expressions
-                    .iter()
-                    .map(|t| {
-                        self.translate_expression(t)
-                            .expect("Cannot create array from void value")
-                    })
-                    .collect::<Vec<_>>();
-                let llvm_type: BasicTypeEnum = CompilerState::get_type(
-                    self.current_state.get_context(),
-                    type_.as_ref(),
-                    self.variables,
-                    Some(expression_values.len()),
-                )
-                .expect("Unexpected void expression type");
+                let array_pointer = self.create_array(
+                    tagged_expressions,
+                    type_.as_ref().to_owned(),
+                );
 
-                Some(unsafe {
-                    self.current_state.build_array_literal(
-                        expression_values.as_slice(),
-                        llvm_type,
-                    )
-                })
+                Some(self.current_state.build_load(array_pointer))
             }
             TaggedExpression::String(string) => {
                 Some(self.current_state.string_literal(&string.value))
             }
             TaggedExpression::Variable(name, expression, _type_) => {
                 let value: BasicValueEnum<'ctx> = self
-                    .translate_expression(expression)
+                    .translate_expression(expression.as_ref().to_owned())
                     .expect("Cannot define variable with void expression");
                 let allocation =
                     self.current_state.store_variable(&name.value, value);
@@ -197,10 +182,10 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             }
             TaggedExpression::Operation(lval, operation, rval, rox_type) => {
                 let left = self
-                    .translate_expression(lval)
+                    .translate_expression(lval.as_ref().to_owned())
                     .expect("Cannot perform operation on void value");
                 let right = self
-                    .translate_expression(rval)
+                    .translate_expression(rval.as_ref().to_owned())
                     .expect("Cannot perform operation on void value");
                 match rox_type.as_ref() {
                     Type::Apply(constructor, _) => match constructor {
@@ -229,31 +214,104 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     }
                 }
             }
-            TaggedExpression::Access(
+            TaggedExpression::BracketAccess(
                 array_value,
                 index_value,
                 _inner_array_type,
             ) => {
                 let lval_expr = self
-                    .translate_expression(array_value)
+                    .translate_expression(array_value.as_ref().to_owned())
                     .unwrap()
                     .into_pointer_value();
                 let index_value = self
-                    .translate_expression(index_value)
+                    .translate_expression(index_value.as_ref().to_owned())
                     .unwrap()
                     .into_int_value();
-                Some(
-                    self.current_state
-                        .build_array_access(lval_expr, index_value),
-                )
+                let value_pointer = self.index_array(lval_expr, index_value);
+                Some(self.current_state.build_load(value_pointer))
             }
-            TaggedExpression::StructInstantiation(_struct_type, _fields) => {
-                todo!()
+            TaggedExpression::Assignment(lval, value_expr, _rox_type) => {
+                let rval = self
+                    .translate_expression(*value_expr)
+                    .expect("Cannot assign Void to variable");
+                let pointer = self.translate_lvalue(lval.as_ref().to_owned());
+
+                self.current_state.build_store(pointer, rval);
+                Some(rval)
             }
-            TaggedExpression::And(_, _)
-            | TaggedExpression::Assignment(_, _, _)
+            TaggedExpression::StructInstantiation(_, _)
+            | TaggedExpression::And(_, _)
             | TaggedExpression::Or(_, _)
             | TaggedExpression::Unary(_, _, _) => todo!(),
         }
+    }
+
+    fn translate_lvalue(&mut self, lval: TaggedLValue) -> PointerValue<'ctx> {
+        match lval.0 {
+            TaggedExpression::BracketAccess(array_value, index_expr, _type) => {
+                let array_pointer = self.translate_lvalue(TaggedLValue(array_value.as_ref().to_owned()));
+                let index = self.translate_expression(index_expr.as_ref().to_owned()).unwrap().into_int_value();
+                self.index_array(array_pointer, index)
+            },
+            TaggedExpression::FunctionCall(..) => {
+                // Note for future @reese -- is this actually a correct assumption?
+                // i.e. can we confidentally assert that return arrays/structs from a function
+                // works correctly this way?
+                self.translate_expression(lval.0).unwrap().into_pointer_value()
+            },
+            TaggedExpression::Identifier(ident_span, _) => {
+                *self.variables.get(&ident_span.value).unwrap()
+            },
+            TaggedExpression::Array(values, inner_type) => {
+                self.create_array(values, inner_type.as_ref().to_owned())
+            },
+            TaggedExpression::And(_, _) |
+            TaggedExpression::Boolean(_) |
+            TaggedExpression::Float(_) |
+            TaggedExpression::Int(_) |
+            TaggedExpression::Operation(_, _, _, _) |
+            TaggedExpression::Or(_, _) |
+            TaggedExpression::String(_) |
+            TaggedExpression::StructInstantiation(_, _) |
+            TaggedExpression::Unary(_, _, _) |
+            TaggedExpression::Assignment(..) |
+            TaggedExpression::Variable(_, _, _) => {
+                unreachable!("Values cannot be assigned to this expression ({:?}) and should have caused errors during parsing or typechecking.", lval.0) }
+        }
+    }
+
+    fn create_array(
+        &mut self,
+        tagged_expressions: Vec<TaggedExpression>,
+        inner_type: Type,
+    ) -> PointerValue<'ctx> {
+        let expression_values = tagged_expressions
+            .iter()
+            .map(|t| {
+                self.translate_expression(t.to_owned())
+                    .expect("Cannot create array from void value")
+            })
+            .collect::<Vec<_>>();
+        let llvm_type: BasicTypeEnum = CompilerState::get_type(
+            self.current_state.get_context(),
+            &inner_type,
+            self.variables,
+            Some(expression_values.len()),
+        )
+        .expect("Unexpected void expression type");
+
+        self.current_state.build_array_allocation_with_values(
+            expression_values.as_slice(),
+            llvm_type,
+        )
+    }
+
+    fn index_array(
+        &mut self,
+        lval_expr: PointerValue<'ctx>,
+        index_value: IntValue<'ctx>,
+    ) -> PointerValue<'ctx> {
+        self.current_state
+            .build_array_access(lval_expr, index_value)
     }
 }

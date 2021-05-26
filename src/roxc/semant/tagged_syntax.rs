@@ -15,7 +15,7 @@ pub struct TaggedLValue(pub TaggedExpression);
 #[derive(Clone, Debug)]
 #[allow(clippy::vec_box, dead_code)]
 pub enum TaggedExpression {
-    Access(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
+    BracketAccess(Box<TaggedExpression>, Box<TaggedExpression>, Box<Type>),
     And(Box<TaggedExpression>, Box<TaggedExpression>),
     Array(Vec<TaggedExpression>, Box<Type>),
     Assignment(Box<TaggedLValue>, Box<TaggedExpression>, Box<Type>),
@@ -47,11 +47,12 @@ impl From<TaggedExpression> for semant::Type {
     fn from(expr: TaggedExpression) -> semant::Type {
         use TaggedExpression::*;
         match expr {
-            Access(_, _, t)
+            BracketAccess(_, _, t)
             | Array(_, t)
             | Assignment(_, _, t)
             | FunctionCall(_, _, t)
             | StructInstantiation(t, _)
+            | Unary(_, _, t)
             | Identifier(_, t) => t.as_ref().clone(),
             And(_, _) | Or(_, _) | Boolean(_) => {
                 Type::Apply(TypeConstructor::Bool, Vec::new())
@@ -70,7 +71,7 @@ impl From<TaggedExpression> for semant::Type {
                     }
                 }
             }
-            Variable(_, _, _) | Unary(_, _, _) => todo!(),
+            Variable(_, _, _) => todo!(),
         }
     }
 }

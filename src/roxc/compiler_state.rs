@@ -70,7 +70,11 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                             maybe_len,
                         )
                         .unwrap();
-                        Some(inner_type.array_type(0).into())
+                        Some(
+                            inner_type
+                                .array_type(maybe_len.unwrap_or(0) as u32)
+                                .into(),
+                        )
                     }
                     Arrow | Record(_) | FunctionType(_, _) | Unique(_) => {
                         todo!()
@@ -126,39 +130,44 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         &self,
         array: PointerValue<'c>,
         index: IntValue<'c>,
-    ) -> BasicValueEnum<'c> {
-        let zero = self.context.i64_type().const_int(1, false);
-        let pointer = unsafe {
-            self.builder.build_in_bounds_gep(array, &[zero, index], "")
-        };
+    ) -> PointerValue<'c> {
+        let one = self.context.i64_type().const_int(1, false);
+        unsafe { self.builder.build_in_bounds_gep(array, &[one, index], "") }
+    }
+
+    pub fn build_load(&self, pointer: PointerValue<'c>) -> BasicValueEnum<'c> {
         self.builder.build_load(pointer, "")
     }
 
-    pub unsafe fn build_array_literal(
+    pub fn build_store(
         &self,
-        items: &[BasicValueEnum],
+        pointer: PointerValue<'c>,
+        value: BasicValueEnum<'c>,
+    ) {
+        self.builder.build_store(pointer, value);
+    }
+
+    /// Allocates an array, loads items into that array, and returns
+    /// a pointer to the array
+    pub fn build_array_allocation_with_values(
+        &self,
+        items: &[BasicValueEnum<'c>],
         type_: BasicTypeEnum<'c>,
-    ) -> BasicValueEnum<'c> {
+    ) -> PointerValue<'c> {
         let len = self.context.i32_type().const_int(items.len() as u64, false);
         let allocation = self.builder.build_array_alloca(type_, len, "");
-        let array = self.builder.build_load(allocation, "load array");
+        let one = self.context.i64_type().const_int(1, false);
 
         items.iter().enumerate().for_each(|(index, item)| {
-            self.builder.build_insert_value(
-                array.into_array_value(),
-                item.as_basic_value_enum(),
-                index as u32,
-                "insert value",
-            );
+            let index = self.context.i16_type().const_int(index as u64, false);
+            let pointer = unsafe {
+                self.builder
+                    .build_in_bounds_gep(allocation, &[one, index], "")
+            };
+            self.build_store(pointer, *item);
         });
 
-        let pointer = self.builder.build_address_space_cast(
-            allocation,
-            allocation.get_type(),
-            "",
-        );
-        let load_inst = self.builder.build_load(pointer, "").into_array_value();
-        load_inst.as_basic_value_enum()
+        allocation
     }
 
     pub fn bool_literal(&self, boolean: bool) -> BasicValueEnum<'c> {
@@ -183,15 +192,6 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.context.const_string(string.as_bytes(), false).into()
     }
 
-    #[allow(dead_code)]
-    pub fn load_variable(
-        &self,
-        pointer: PointerValue<'c>,
-        name: &str,
-    ) -> BasicValueEnum<'c> {
-        self.builder.build_load(pointer, name)
-    }
-
     pub fn store_variable(
         &self,
         name: &str,
@@ -199,7 +199,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
     ) -> PointerValue<'c> {
         let allocation =
             self.create_entry_block_allocation(name, value.get_type());
-        self.builder.build_store(allocation, value);
+        self.build_store(allocation, value);
         allocation
     }
 
