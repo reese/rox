@@ -69,12 +69,20 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                             environment,
                             maybe_len,
                         )
+                        /*
+                        TODO: Arrays will need to be stored as structs with both their length and a pointer to the array (see Rust function argument example output)
+
+
+
+
+
+
+
+
+
+                        */
                         .unwrap();
-                        Some(
-                            inner_type
-                                .array_type(maybe_len.unwrap_or(0) as u32)
-                                .into(),
-                        )
+                        Some(inner_type.array_type(0).into())
                     }
                     Arrow | Record(_) | FunctionType(_, _) | Unique(_) => {
                         todo!()
