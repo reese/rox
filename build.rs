@@ -23,12 +23,17 @@ fn main() {
     }
 }
 
-fn write_test(test_file: &mut File, directory: &walkdir::DirEntry) {
-    let directory = directory.path().canonicalize().unwrap();
-    let path = directory.display();
+fn write_test(test_file: &mut File, entry: &walkdir::DirEntry) {
+    let entry = entry.path().canonicalize().unwrap();
+    let path = entry.display();
     let test_name = format!(
-        "rox_compile_test_{}",
-        directory.file_stem().unwrap().to_string_lossy()
+        "rox_compile_test{}",
+        entry.to_str().unwrap()
+            // Scrub to a relative path
+            .replace(std::env::current_dir().unwrap().to_str().unwrap(), "")
+            .replace("/", "_")
+            // Remove file ending (assuming this is always .rox)
+            .replace(".rox", "")
     );
 
     write!(
