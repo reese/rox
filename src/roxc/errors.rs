@@ -35,7 +35,7 @@ pub struct RoxError {
 
 impl RoxError {
     pub fn new<T: Clone + Into<PathBuf>>(file: T, message: &str) -> Self {
-        let contents = read_to_string(file.clone().into()).unwrap();
+        let contents = read_to_string(dbg!(file.clone().into())).unwrap();
         RoxError {
             file: SimpleFile::new(
                 file.into().to_str().unwrap().to_string(),

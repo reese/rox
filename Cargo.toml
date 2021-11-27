@@ -28,6 +28,7 @@ harness = false
 
 [build-dependencies]
 lalrpop = { version = "0.19.1", features = ["lexer"] }
+walkdir = "2"
 
 [dependencies]
 codespan-reporting = "0.9.5"

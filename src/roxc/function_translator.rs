@@ -227,7 +227,8 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                     .translate_expression(index_value.as_ref().to_owned())
                     .unwrap()
                     .into_int_value();
-                let value_pointer = dbg!(self.index_array(lval_expr, index_value));
+                let value_pointer =
+                    dbg!(self.index_array(lval_expr, index_value));
                 Some(self.current_state.build_load(value_pointer))
             }
             TaggedExpression::Assignment(lval, value_expr, _rox_type) => {
@@ -311,6 +312,9 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
         lval_expr: PointerValue<'ctx>,
         index_value: IntValue<'ctx>,
     ) -> PointerValue<'ctx> {
-        unsafe {self.current_state.build_array_access(lval_expr, index_value) }
+        unsafe {
+            self.current_state
+                .build_array_access(lval_expr, index_value)
+        }
     }
 }

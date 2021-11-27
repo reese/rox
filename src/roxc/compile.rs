@@ -60,8 +60,15 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
         }
     }
 
-    pub fn finish(&self, path: impl Into<PathBuf> + Sized) -> bool {
-        self.module.print_to_stderr();
+    pub fn finish(
+        &self,
+        path: impl Into<PathBuf> + Sized,
+        print_stderr: bool,
+    ) -> bool {
+        if print_stderr {
+            self.module.print_to_stderr();
+        }
+
         self.module.write_bitcode_to_path(&path.into())
     }
 

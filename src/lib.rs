@@ -103,6 +103,6 @@ where
         &mut environment_stack,
         &mut function_stack,
     );
-    compiler.compile(declarations).unwrap();
-    compiler.finish(bitcode_file_output);
+    let is_successful = compiler.compile(declarations).is_ok();
+    compiler.finish(bitcode_file_output, is_successful);
 }

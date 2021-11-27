@@ -71,7 +71,9 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                             maybe_len,
                         )
                         .unwrap();
-                        let array_type = inner_type.array_type(0).ptr_type(AddressSpace::Generic);
+                        let array_type = inner_type
+                            .array_type(0)
+                            .ptr_type(AddressSpace::Generic);
                         // TODO: This just store the array length as an i64, but should probably check if that's a reasonable assumption
                         // or if LLVM supports unsigned int types
                         //
@@ -80,11 +82,12 @@ impl<'f, 'c> CompilerState<'f, 'c> {
                         // of the array.
                         // We'll need to do manual bound checks on these to prevent out-of-bounds access.
                         let struct_type = context.struct_type(
-                        &[
-                            array_type.as_basic_type_enum(),
-                            context.i32_type().as_basic_type_enum()
-                        ],
-                        false); // Not packing these structs
+                            &[
+                                array_type.as_basic_type_enum(),
+                                context.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ); // Not packing these structs
                         Some(struct_type.as_basic_type_enum())
                     }
                     Arrow | Record(_) | FunctionType(_, _) | Unique(_) => {
@@ -143,14 +146,17 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         index: IntValue<'c>,
     ) -> PointerValue<'c> {
         // Load array length and do a bounds check
-        let _array_len = self.builder.build_struct_gep(array_struct, 1, "").unwrap();
+        let _array_len =
+            self.builder.build_struct_gep(array_struct, 1, "").unwrap();
         // TODO: bounds check here
 
         // index from struct
         let one = self.context.i64_type().const_int(1, false);
-        let array_ref = dbg!(self.builder.build_struct_gep(array_struct, 0, "").unwrap());
+        let array_ref =
+            dbg!(self.builder.build_struct_gep(array_struct, 0, "").unwrap());
         let loaded_array = self.build_load(array_ref).into_pointer_value();
-        self.builder.build_in_bounds_gep(loaded_array, &[one, index], "")
+        self.builder
+            .build_in_bounds_gep(loaded_array, &[one, index], "")
     }
 
     pub fn build_load(&self, pointer: PointerValue<'c>) -> BasicValueEnum<'c> {
@@ -173,13 +179,15 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         type_: BasicTypeEnum<'c>,
     ) -> PointerValue<'c> {
         let len = self.context.i32_type().const_int(items.len() as u64, false);
-        let array_pointer_type = type_.into_struct_type()
+        let array_pointer_type = type_
+            .into_struct_type()
             .get_field_type_at_index(0)
             .expect("Array type did not have inner array type at index 0")
             .into_pointer_type()
             .get_element_type()
             .into_array_type();
-        let allocation = self.builder.build_array_alloca(array_pointer_type, len, "");
+        let allocation =
+            self.builder.build_array_alloca(array_pointer_type, len, "");
         let one = self.context.i64_type().const_int(1, false);
 
         items.iter().enumerate().for_each(|(index, item)| {
@@ -233,14 +241,26 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         length_value: IntValue<'c>,
     ) -> PointerValue<'c> {
         let struct_allocation = self.builder.build_alloca(
-            self.context.struct_type(&[
-                array_pointer.get_type().as_basic_type_enum(),
-                length_value.get_type().as_basic_type_enum()
-            ], false),
-            ""
+            self.context.struct_type(
+                &[
+                    array_pointer.get_type().as_basic_type_enum(),
+                    length_value.get_type().as_basic_type_enum(),
+                ],
+                false,
+            ),
+            "",
         );
-        [array_pointer.as_basic_value_enum(), length_value.as_basic_value_enum()].iter().enumerate().for_each(|(index, val)| {
-            let struct_position = self.builder.build_struct_gep(struct_allocation, index as u32, "").unwrap();
+        [
+            array_pointer.as_basic_value_enum(),
+            length_value.as_basic_value_enum(),
+        ]
+        .iter()
+        .enumerate()
+        .for_each(|(index, val)| {
+            let struct_position = self
+                .builder
+                .build_struct_gep(struct_allocation, index as u32, "")
+                .unwrap();
             self.build_store(struct_position, val.as_basic_value_enum());
         });
         struct_allocation
