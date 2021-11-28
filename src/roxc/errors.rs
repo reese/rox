@@ -54,7 +54,7 @@ impl RoxError {
     }
 
     pub fn with_file_placeholder(message: &str) -> Self {
-        let path = PathBuf::from("./examples/array.rox");
+        let path = PathBuf::from("./examples/array/array_creation.rox");
         Self::new(path, message)
     }
 

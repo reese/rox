@@ -1,0 +1,6 @@
+fn main() -> Int do
+    if false do
+        return 1;
+    end
+    return 0;
+end

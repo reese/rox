@@ -117,14 +117,14 @@ impl<'f, 'c> CompilerState<'f, 'c> {
 
     pub fn build_conditional(
         &self,
-        conditional_expression_value: FloatValue,
+        conditional_expression_value: IntValue,
         branch_name: &str,
         if_block: BasicBlock,
         else_block: BasicBlock,
     ) {
-        let zero_const = self.context.f64_type().const_zero();
-        let conditional = self.builder.build_float_compare(
-            FloatPredicate::ONE,
+        let zero_const = self.context.bool_type().const_zero();
+        let conditional = self.builder.build_int_compare(
+            IntPredicate::NE,
             conditional_expression_value,
             zero_const,
             branch_name,
@@ -205,7 +205,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
     pub fn bool_literal(&self, boolean: bool) -> BasicValueEnum<'c> {
         self.context
             .bool_type()
-            .const_int(boolean as u64, false)
+            .const_int(dbg!(boolean as u64), false)
             .into()
     }
 

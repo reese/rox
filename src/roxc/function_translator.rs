@@ -77,12 +77,12 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                 let else_block = self.current_state.append_basic_block("else");
                 let merge_block =
                     self.current_state.append_basic_block("continue");
-                let conditional_value = self
-                    .translate_expression(conditional.as_ref().to_owned())
+                let conditional_value = dbg!(self
+                    .translate_expression(conditional.as_ref().to_owned()))
                     .expect("Cannot evaluate condition with void value")
-                    .into_float_value();
+                    .into_int_value();
                 self.current_state.build_conditional(
-                    conditional_value,
+                    dbg!(conditional_value),
                     "ifcond",
                     if_block,
                     else_block,
