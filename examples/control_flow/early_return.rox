@@ -1,3 +1,4 @@
+// @test-ignore
 fn main() -> Int do
     if false do
         return 1;
