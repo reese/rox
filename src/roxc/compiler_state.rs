@@ -98,9 +98,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
             Type::Variable(variable_name) => environment
                 .get(variable_name)
                 .map(|var| var.get_type().as_basic_type_enum()),
-            Type::Polymorphic(_formal_arguments, _types) => {
-                unimplemented!()
-            }
+            Type::Polymorphic(_formal_arguments, _types) => unimplemented!(),
         }
     }
 
