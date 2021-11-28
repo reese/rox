@@ -117,14 +117,14 @@ impl<'f, 'c> CompilerState<'f, 'c> {
 
     pub fn build_conditional(
         &self,
-        conditional_expression_value: IntValue,
+        conditional_expression_value: FloatValue,
         branch_name: &str,
         if_block: BasicBlock,
         else_block: BasicBlock,
     ) {
-        let zero_const = self.context.bool_type().const_zero();
-        let conditional = self.builder.build_int_compare(
-            IntPredicate::NE,
+        let zero_const = self.context.f64_type().const_zero();
+        let conditional = self.builder.build_float_compare(
+            FloatPredicate::ONE,
             conditional_expression_value,
             zero_const,
             branch_name,

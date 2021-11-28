@@ -28,7 +28,9 @@ fn write_test(test_file: &mut File, entry: &walkdir::DirEntry) {
     let path = entry.display();
     let test_name = format!(
         "rox_compile_test{}",
-        entry.to_str().unwrap()
+        entry
+            .to_str()
+            .unwrap()
             // Scrub to a relative path
             .replace(std::env::current_dir().unwrap().to_str().unwrap(), "")
             .replace("/", "_")
