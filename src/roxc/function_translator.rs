@@ -58,7 +58,8 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
             }
             TaggedStatement::Return(maybe_expression) => {
                 if let Some(expression) = maybe_expression {
-                    if let Some(return_) = self.translate_expression(expression.to_owned())
+                    if let Some(return_) =
+                        self.translate_expression(expression.to_owned())
                     {
                         self.current_state.build_return(Some(&return_));
                     } else {
@@ -250,34 +251,42 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
     fn translate_lvalue(&mut self, lval: TaggedLValue) -> PointerValue<'ctx> {
         match lval.0 {
             TaggedExpression::BracketAccess(array_value, index_expr, _type) => {
-                let array_pointer = self.translate_lvalue(TaggedLValue(array_value.as_ref().to_owned()));
-                let index = self.translate_expression(index_expr.as_ref().to_owned()).unwrap().into_int_value();
+                let array_pointer = self.translate_lvalue(TaggedLValue(
+                    array_value.as_ref().to_owned(),
+                ));
+                let index = self
+                    .translate_expression(index_expr.as_ref().to_owned())
+                    .unwrap()
+                    .into_int_value();
                 self.index_array(array_pointer, index)
-            },
+            }
             TaggedExpression::FunctionCall(..) => {
                 // Note for future @reese -- is this actually a correct assumption?
                 // i.e. can we confidentally assert that return arrays/structs from a function
                 // works correctly this way?
-                self.translate_expression(lval.0).unwrap().into_pointer_value()
-            },
+                self.translate_expression(lval.0)
+                    .unwrap()
+                    .into_pointer_value()
+            }
             TaggedExpression::Identifier(ident_span, _) => {
                 *self.variables.get(&ident_span.value).unwrap()
-            },
+            }
             TaggedExpression::Array(values, inner_type) => {
                 self.create_array(values, inner_type.as_ref().to_owned())
-            },
-            TaggedExpression::And(_, _) |
-            TaggedExpression::Boolean(_) |
-            TaggedExpression::Float(_) |
-            TaggedExpression::Int(_) |
-            TaggedExpression::Operation(_, _, _, _) |
-            TaggedExpression::Or(_, _) |
-            TaggedExpression::String(_) |
-            TaggedExpression::StructInstantiation(_, _) |
-            TaggedExpression::Unary(_, _, _) |
-            TaggedExpression::Assignment(..) |
-            TaggedExpression::Variable(_, _, _) => {
-                unreachable!("Values cannot be assigned to this expression ({:?}) and should have caused errors during parsing or typechecking.", lval.0) }
+            }
+            TaggedExpression::And(_, _)
+            | TaggedExpression::Boolean(_)
+            | TaggedExpression::Float(_)
+            | TaggedExpression::Int(_)
+            | TaggedExpression::Operation(_, _, _, _)
+            | TaggedExpression::Or(_, _)
+            | TaggedExpression::String(_)
+            | TaggedExpression::StructInstantiation(_, _)
+            | TaggedExpression::Unary(_, _, _)
+            | TaggedExpression::Assignment(..)
+            | TaggedExpression::Variable(_, _, _) => {
+                unreachable!("Values cannot be assigned to this expression ({:?}) and should have caused errors during parsing or typechecking.", lval.0)
+            }
         }
     }
 

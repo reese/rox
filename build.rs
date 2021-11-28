@@ -1,7 +1,7 @@
 extern crate lalrpop;
 
 use std::env;
-use std::fs::{File, read_to_string};
+use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -20,7 +20,10 @@ fn main() {
         .filter(|e| e.file_type().is_file());
     for entry in test_data_directories {
         // Ignore tests that have a `// @test-ignore` comment
-        if !read_to_string(entry.path()).unwrap().contains("// @test-ignore") {
+        if !read_to_string(entry.path())
+            .unwrap()
+            .contains("// @test-ignore")
+        {
             write_test(&mut test_file, &entry);
         }
     }
