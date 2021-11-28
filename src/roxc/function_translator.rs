@@ -209,7 +209,7 @@ impl<'func, 'ctx> FunctionTranslator<'func, 'ctx> {
                         }
                         _ => unreachable!(),
                     },
-                    Type::Variable(_) | Type::PolymorphicType(_, _) => {
+                    Type::Variable(_) | Type::Polymorphic(_, _) => {
                         unreachable!()
                     }
                 }

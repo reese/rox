@@ -63,7 +63,7 @@ fn substitute(ty: Type, env: &mut TypeEnv) -> Type {
             Some(type_) => type_.clone(),
             None => Type::Variable(identifier),
         },
-        Type::PolymorphicType(formal_parameters, type_) => {
+        Type::Polymorphic(formal_parameters, type_) => {
             // NOTICE: This could totally be wrong because I have no idea what I'm doing.
             // Use with caution.
             let new_formal_parameters = formal_parameters.clone();
@@ -76,7 +76,7 @@ fn substitute(ty: Type, env: &mut TypeEnv) -> Type {
                     .collect::<Vec<_>>(),
             );
             let new_type = substitute(*type_, &mut inner_scope);
-            Type::PolymorphicType(new_formal_parameters, Box::new(new_type))
+            Type::Polymorphic(new_formal_parameters, Box::new(new_type))
         }
     }
 }
@@ -97,8 +97,8 @@ fn unify(type_one: Type, type_two: Type) -> Result<()> {
             }
         }
         (
-            Type::PolymorphicType(original_formal_parameters, original_type),
-            Type::PolymorphicType(other_format_parameters, other_type),
+            Type::Polymorphic(original_formal_parameters, original_type),
+            Type::Polymorphic(other_format_parameters, other_type),
         ) => {
             let other_env: &mut TypeEnv = &mut zip_argument_types(
                 other_format_parameters,
@@ -221,7 +221,7 @@ fn translate_statement(
             parameter_types.push(return_type.clone());
             variable_env.insert(
                 func_name.clone(),
-                Type::PolymorphicType(
+                Type::Polymorphic(
                     Vec::new(),
                     Box::new(Type::Apply(
                         TypeConstructor::Arrow,
@@ -268,7 +268,7 @@ fn translate_statement(
                 .map(|(_, t)| t.clone())
                 .collect::<Vec<_>>();
 
-            let new_type = Type::PolymorphicType(
+            let new_type = Type::Polymorphic(
                 maybe_formal_arguments.unwrap_or_else(Vec::new),
                 Box::new(Type::Apply(
                     TypeConstructor::Record(translated_fields),
@@ -323,7 +323,7 @@ fn translate_statement(
 
             variable_env.insert(
                 func_name.clone(),
-                Type::PolymorphicType(
+                Type::Polymorphic(
                     maybe_formal_arguments.unwrap_or_else(Vec::new),
                     Box::new(Type::Apply(
                         TypeConstructor::Arrow,
@@ -583,7 +583,7 @@ fn translate_expression(
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
-            if let Type::PolymorphicType(generics, func_type_constructor) =
+            if let Type::Polymorphic(generics, func_type_constructor) =
                 expand(tagged_function_identifier.into())
             {
                 let mut all_types: TypeEnv = type_env
@@ -690,7 +690,7 @@ fn translate_expression(
 
             let struct_type = type_env.get(&identifier.value).unwrap();
 
-            if let Type::PolymorphicType(generics, record_type_constructor) =
+            if let Type::Polymorphic(generics, record_type_constructor) =
                 expand(tagged_struct_identifier.into())
             {
                 let fields = record_type_constructor.get_record_fields();

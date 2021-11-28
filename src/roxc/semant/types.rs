@@ -39,7 +39,7 @@ pub enum Type {
     Variable(String),
     /// (0) is the list of formal arguments,
     /// and (1) is the rest of the type declaration
-    PolymorphicType(Vec<Identifier>, Box<Type>),
+    Polymorphic(Vec<Identifier>, Box<Type>),
 }
 
 impl Type {

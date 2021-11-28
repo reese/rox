@@ -97,7 +97,7 @@ where
     let function_pass_manager = PassManager::create(&module);
 
     let mut compiler = Compiler::new(
-        &context,
+        context,
         &module,
         &function_pass_manager,
         &mut environment_stack,

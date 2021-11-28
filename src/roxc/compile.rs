@@ -136,9 +136,9 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
 
                 let current_state = CompilerState::new(
                     builder,
-                    &self.context,
+                    self.context,
                     fn_value,
-                    &self.module,
+                    self.module,
                 );
 
                 let mut function_translator = FunctionTranslator::new(
