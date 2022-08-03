@@ -429,7 +429,11 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         args: &[BasicValueEnum<'c>],
     ) -> Option<BasicValueEnum<'c>> {
         self.builder
-            .build_call(function, args, "tmp")
+            .build_call(
+                function,
+                &args.iter().map(|a| a.clone().into()).collect::<Vec<_>>(),
+                "tmp",
+            )
             .try_as_basic_value()
             .left()
     }

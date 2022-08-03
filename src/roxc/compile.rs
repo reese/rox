@@ -136,9 +136,9 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
 
                 let current_state = CompilerState::new(
                     builder,
-                    &self.context,
+                    self.context,
                     fn_value,
-                    &self.module,
+                    self.module,
                 );
 
                 let mut function_translator = FunctionTranslator::new(
@@ -201,11 +201,22 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
             self.environment_stack.top(),
             None,
         ) {
-            Some(t) => t.fn_type(param_types.as_slice(), false),
-            None => self
-                .context
-                .void_type()
-                .fn_type(param_types.as_slice(), false),
+            Some(t) => t.fn_type(
+                param_types
+                    .iter()
+                    .map(|a| a.clone().into())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+                false,
+            ),
+            None => self.context.void_type().fn_type(
+                param_types
+                    .iter()
+                    .map(|a| a.clone().into())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+                false,
+            ),
         };
         let fn_value =
             self.module.add_function(func_name.as_str(), fn_type, None);

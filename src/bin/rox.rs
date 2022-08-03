@@ -19,9 +19,6 @@ enum Roxc {
         /// The name of the output executable
         #[structopt(short, long)]
         output: PathBuf,
-        /// Option to not link the native object file
-        #[structopt(short, long)]
-        no_link: bool,
     },
     /// Executes the program with Rox's JIT compiler
     Run {
