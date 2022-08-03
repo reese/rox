@@ -33,7 +33,7 @@ fn write_test(test_file: &mut File, entry: &walkdir::DirEntry) {
             .unwrap()
             // Scrub to a relative path
             .replace(std::env::current_dir().unwrap().to_str().unwrap(), "")
-            .replace("/", "_")
+            .replace('/', "_")
             // Remove file ending (assuming this is always .rox)
             .replace(".rox", "")
     );

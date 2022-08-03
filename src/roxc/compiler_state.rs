@@ -431,7 +431,7 @@ impl<'f, 'c> CompilerState<'f, 'c> {
         self.builder
             .build_call(
                 function,
-                &args.iter().map(|a| a.clone().into()).collect::<Vec<_>>(),
+                &args.iter().map(|a| (*a).into()).collect::<Vec<_>>(),
                 "tmp",
             )
             .try_as_basic_value()

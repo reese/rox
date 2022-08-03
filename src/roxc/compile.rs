@@ -189,10 +189,12 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
                     self.environment_stack.top(),
                     Some(0),
                 )
-                .expect(&*format!(
+                .unwrap_or_else(|| {
+                    panic!(
                     "Cannot handle void parameter type or undefined type {:?}",
                     ty
-                ))
+                )
+                })
             })
             .collect::<Vec<_>>();
         let fn_type = match CompilerState::get_type(
@@ -204,7 +206,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
             Some(t) => t.fn_type(
                 param_types
                     .iter()
-                    .map(|a| a.clone().into())
+                    .map(|a| (*a).into())
                     .collect::<Vec<_>>()
                     .as_slice(),
                 false,
@@ -212,7 +214,7 @@ impl<'a, 'ctx, 'm> Compiler<'a, 'ctx, 'm> {
             None => self.context.void_type().fn_type(
                 param_types
                     .iter()
-                    .map(|a| a.clone().into())
+                    .map(|a| (*a).into())
                     .collect::<Vec<_>>()
                     .as_slice(),
                 false,

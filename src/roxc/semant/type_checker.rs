@@ -269,7 +269,7 @@ fn translate_statement(
                 .collect::<Vec<_>>();
 
             let new_type = Type::PolymorphicType(
-                maybe_formal_arguments.unwrap_or_else(Vec::new),
+                maybe_formal_arguments.unwrap_or_default(),
                 Box::new(Type::Apply(
                     TypeConstructor::Record(translated_fields),
                     field_types,
@@ -324,7 +324,7 @@ fn translate_statement(
             variable_env.insert(
                 func_name.clone(),
                 Type::PolymorphicType(
-                    maybe_formal_arguments.unwrap_or_else(Vec::new),
+                    maybe_formal_arguments.unwrap_or_default(),
                     Box::new(Type::Apply(
                         TypeConstructor::Arrow,
                         parameter_types.clone(),
